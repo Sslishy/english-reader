@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f6fdb">
+<title>雅思英语阅读器 · 每日阅读 + 背单词</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>📖 雅思阅读器<small>目标 6.5</small></h1>
+    <button id="btnSettings" class="icon" title="设置" aria-label="设置">⚙️</button>
+  </div>
+  <nav class="tabs" id="tabs">
+    <a href="#/read" data-tab="read">📰 今日阅读</a>
+    <a href="#/review" data-tab="review">🔁 复习<span class="badge" id="dueBadge" hidden>0</span></a>
+    <a href="#/vocab" data-tab="vocab">📒 生词本<span class="badge muted-badge" id="vocabCount">0</span></a>
+    <a href="#/paste" data-tab="paste">✏️ 自己粘贴</a>
+  </nav>
+</header>
+
+<main>
+  <!-- ========== 今日阅读 ========== -->
+  <section id="view-read" class="view" hidden>
+    <div id="articleBox">
+      <p class="muted"><span class="spinner"></span>正在载入今日文章…</p>
+    </div>
+    <div class="card" id="archiveCard">
+      <h3 class="card-title">🗂 往期文章</h3>
+      <ul id="archiveList" class="archive"></ul>
+    </div>
+  </section>
+
+  <!-- ========== 复习 ========== -->
+  <section id="view-review" class="view" hidden>
+    <div id="reviewBox"></div>
+  </section>
+
+  <!-- ========== 生词本 ========== -->
+  <section id="view-vocab" class="view" hidden>
+    <div class="card">
+      <div class="vh">
+        <h2>📒 生词本 <span class="muted" id="vocabCount2"></span></h2>
+        <button id="btnHideZh">遮住中文</button>
+        <button id="btnExport">导出 CSV</button>
+      </div>
+      <div class="row">
+        <input type="text" id="vocabFilter" placeholder="搜索生词…" style="flex:1;min-width:120px">
+        <select id="vocabSort">
+          <option value="new">最新在前</option><option value="old">最早在前</option>
+          <option value="az">A → Z</option><option value="due">按复习时间</option>
+        </select>
+        <select id="vocabSrc">
+          <option value="all">全部来源</option><option value="reading">阅读收藏</option><option value="cet">四六级新词</option>
+        </select>
+      </div>
+      <div id="vocabList"></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">💾 备份 / 迁移（手机 ⇄ 电脑）</h3>
+      <p class="hint">所有数据只保存在本浏览器（localStorage）。换设备前先「导出备份」，在另一台设备上「导入」即可。备份包含生词本、复习进度、已学四六级词和设置。</p>
+      <div class="row">
+        <button class="primary" id="btnBackup">⬇️ 导出备份 JSON</button>
+        <button id="btnImportMerge">⬆️ 导入（合并）</button>
+        <button id="btnImportReplace" class="danger">⬆️ 导入（覆盖本地）</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== 自己粘贴 ========== -->
+  <section id="view-paste" class="view" hidden>
+    <div id="inputView">
+      <div class="card">
+        <div style="font-weight:600;margin-bottom:6px">粘贴英文文章</div>
+        <textarea id="src" placeholder="在此粘贴任意英文文章（例如雅思阅读、外刊、新闻）……"></textarea>
+        <div class="row">
+          <button class="primary" id="btnRead">进入阅读模式 →</button>
+          <button id="btnSample1">示例 1：城市农业</button>
+          <button id="btnSample2">示例 2：睡眠与记忆</button>
+          <button id="btnClear" class="danger">清空</button>
+        </div>
+        <p class="hint">提示：阅读模式下，电脑端<b>双击</b>单词、手机端<b>轻点</b>单词，即可查看音标、中文释义、英文释义和例句。</p>
+      </div>
+    </div>
+    <div id="readView" hidden>
+      <div class="toolbar">
+        <button id="btnEdit">← 编辑文章</button>
+        <span class="hint">双击 / 轻点单词查词 · <span class="hl-sample">黄色</span> = 生词本中的词</span>
+      </div>
+      <div class="card"><article id="pasteReader" class="reader"></article></div>
+    </div>
+  </section>
+</main>
+
+<!-- 设置 -->
+<div id="settingsPanel" class="modal" hidden>
+  <div class="modal-box">
+    <div class="vh"><h2>⚙️ 设置</h2><button id="btnCloseSettings" aria-label="关闭">✕</button></div>
+    <div class="row">
+      <label class="opt">发音口音
+        <select id="optAccent"><option value="en-US">美音 en-US</option><option value="en-GB">英音 en-GB</option></select>
+      </label>
+      <label class="opt"><input type="checkbox" id="optAuto"> 查词时自动发音</label>
+      <label class="opt">阅读字号
+        <select id="optSize"><option value="17">小</option><option value="20">中</option><option value="23">大</option><option value="26">特大</option></select>
+      </label>
+    </div>
+    <div class="row">
+      <label class="opt" style="flex-wrap:wrap">MyMemory 邮箱（可选）
+        <input type="email" id="optEmail" placeholder="填写你自己的邮箱可提高每日翻译额度" style="min-width:220px">
+      </label>
+    </div>
+    <p class="hint">中文释义来自内置四六级词库、中文维基词典（zh.wiktionary）与 MyMemory 免费翻译接口（匿名每天约 5000 字符额度；填写邮箱可提高到约 50000）。都没有结果时，改用英文维基词典中的中文译词（可能是繁体）。英文释义来自 Free Dictionary API，不可用时自动改用维基词典。查过的词会缓存在本地。</p>
+  </div>
+</div>
+
+<!-- 查词弹窗 -->
+<div id="pop" role="dialog" aria-live="polite"></div>
+<div id="toast"></div>
+
+<script src="js/srs.js"></script>
+<script src="js/app.js"></script>
+<script src="js/review.js"></script>
+<script>ER.start();</script>
+</body>
+</html>
