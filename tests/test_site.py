@@ -8,6 +8,7 @@
 Uses ?today=YYYY-MM-DD to simulate several days of spaced repetition.
 """
 import json, os, socket, subprocess, sys, time, tempfile, re
+from urllib.parse import unquote_plus
 from playwright.sync_api import sync_playwright
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -31,7 +32,10 @@ time.sleep(0.8)
 BASE = f"http://127.0.0.1:{PORT}/"
 
 # ---------- mocked dictionary services ----------
-FAKE_ZH = {"emission": "排放；排放物", "sobering": "令人清醒的", "scenario": "情景；设想", "farming": "农业", "consolidation": "巩固", "goal": "目标"}
+FAKE_ZH = {"emission": "排放；排放物", "sobering": "令人清醒的", "scenario": "情景；设想", "farming": "农业", "consolidation": "巩固", "goal": "目标",
+           # phrases (MyMemory en|zh-CN); anything else -> empty translation = "translation failed"
+           "sobering message": "发人深省的信息", "carbon emissions": "碳排放", "make ends meet": "勉强维持生计",
+           "climate summit": "气候峰会", "play a complementary role": "发挥补充作用"}
 
 
 def mock_routes(ctx):
@@ -47,7 +51,7 @@ def mock_routes(ctx):
 
     def mymemory(route):
         m = re.search(r"[?&]q=([^&]+)", route.request.url)
-        w = m.group(1).lower() if m else ""
+        w = unquote_plus(m.group(1)).lower() if m else ""
         zh = FAKE_ZH.get(w, "")
         route.fulfill(status=200, content_type="application/json",
                       body=json.dumps({"responseStatus": 200, "responseData": {"translatedText": zh}, "matches": []}))
@@ -76,10 +80,32 @@ def goto(page, day, hash_="#/read"):
     page.wait_for_function("window.ER && ER.today")
 
 
-def run_session(page, wrong=(), allow_retry_wrong=False, max_steps=200):
+def drag_select(page, sel_from, sel_to):
+    """Real mouse drag from the start of one word span to the end of another."""
+    a_loc, b_loc = page.locator(sel_from).first, page.locator(sel_to).first
+    a_loc.scroll_into_view_if_needed()
+    a, b = a_loc.bounding_box(), b_loc.bounding_box()
+    page.mouse.move(a["x"] + 2, a["y"] + a["height"] / 2)
+    page.mouse.down()
+    page.mouse.move((a["x"] + b["x"]) / 2 + 1, b["y"] + b["height"] / 2, steps=4)
+    page.mouse.move(b["x"] + b["width"] - 2, b["y"] + b["height"] / 2, steps=4)
+    page.mouse.up()
+
+
+def wait_phrase_pop(page):
+    page.wait_for_function("document.querySelector('#pop.show.phrase') && !document.querySelector('#pop .spinner')")
+
+
+def force_type(page, w, t):
+    """Set srs.qn so that SRS.qtype() gives question type t for entry w."""
+    page.evaluate("""([w,t])=>{var v=ER.findWord(w);for(var q=0;q<3;q++){if(SRS.qtype(v.word,{qn:q})===t){v.srs.qn=q;break;}}ER.saveVocab();}""", [w, t])
+
+
+def run_session(page, wrong=(), allow_retry_wrong=False, max_steps=200, log=None, tap=False, shots=None):
     """Click through the current review session. Words in `wrong` are answered wrongly on their first attempt."""
     seen_types, steps, retries = set(), 0, []
-    page.click("#btnStart")
+    act = (lambda loc: loc.tap()) if tap else (lambda loc: loc.click())
+    act(page.locator("#btnStart"))
     while steps < max_steps:
         steps += 1
         page.wait_for_function("document.querySelector('#qCard,#btnGotIt,#summaryCard')")
@@ -92,19 +118,37 @@ def run_session(page, wrong=(), allow_retry_wrong=False, max_steps=200):
         bad = st["first"] and st["word"] in wrong
         if not st["first"]:
             retries.append(st["word"])
+        entry = {"word": st["word"], "type": st["type"], "first": st["first"], "bad": bad}
+        if shots is not None and st["type"] not in shots:
+            shots[st["type"]] = f"/tmp/er_mobile_q_{st['type']}.png"; page.screenshot(path=shots[st["type"]])
         if st["type"] == "spell":
-            page.fill("#spellInput", ("zz" + st["word"]) if bad else st["word"].upper())  # upper: case-insensitive check
-            page.click("#btnCheck")
+            if " " in st["word"]:   # phrase: case, punctuation and extra spaces must be ignored
+                ans = ("zz " + st["word"]) if bad else "  " + st["word"].upper().replace(" ", "   ") + " !!"
+            else:
+                ans = ("zz" + st["word"]) if bad else st["word"].upper()  # upper: case-insensitive check
+            page.fill("#spellInput", ans)
+            act(page.locator("#btnCheck"))
+        elif st["type"] == "order":
+            n = page.locator("#orderPool .tile").count()
+            for i in (reversed(range(n)) if bad else range(n)):
+                act(page.locator(f'#orderPool .tile[data-i="{i}"]'))
+            entry["placed"] = page.evaluate("Array.from(document.querySelectorAll('#orderAns .tile')).map(t=>t.textContent).join(' ')")
+            act(page.locator("#btnCheck"))
         else:
+            entry["opts"] = page.evaluate("Array.from(document.querySelectorAll('.opts button')).map(b=>b.dataset.opt)")
             opts = page.locator(".opts button")
             target = None
             for i in range(opts.count()):
                 o = opts.nth(i).get_attribute("data-opt")
                 if (o == st["answer"]) != bad:
                     target = opts.nth(i); break
-            target.click()
+            act(target)
         page.wait_for_selector("#btnNext:not([hidden])")
         fb = page.inner_text("#feedback")
+        entry["ok"] = "正确！" in fb
+        entry["diff"] = page.locator("#diff").count() > 0
+        if log is not None:
+            log.append(entry)
         if bad:
             assert "正确答案" in fb, fb
         cur = page.evaluate("(()=>{var s=ER.views.review.state();return s?s.idx:-1})()")
@@ -293,7 +337,212 @@ with sync_playwright() as p:
     mp.wait_for_selector("#qCard"); mp.screenshot(path="/tmp/er_mobile_test.png")
     page.goto(f"{BASE}?today=2026-10-23#/read"); page.wait_for_selector("#articleReader h2"); page.screenshot(path="/tmp/er_desktop_read.png", full_page=True)
 
-    # ---------- 9. live lookup (optional, real network) ----------
+
+    # ---------- 9. phrases / short sentences (fresh profile) ----------
+    pc = browser.new_context(accept_downloads=True, viewport={"width": 1100, "height": 900})
+    mock_routes(pc)
+    pp = pc.new_page(); attach(pp, "phrase")
+    goto(pp, "2026-10-23"); pp.wait_for_selector("#articleReader h2")
+    AR = "#articleReader"
+    # single-word drag selection on desktop: behaves as before (nothing pops up)
+    box_ = pp.locator(f'{AR} .w[data-w="sobering"]').first.bounding_box()
+    pp.mouse.move(box_["x"] + 2, box_["y"] + 8); pp.mouse.down(); pp.mouse.move(box_["x"] + box_["width"] - 2, box_["y"] + 8, steps=4); pp.mouse.up()
+    pp.wait_for_timeout(700)
+    check("desktop: single-word selection opens nothing", pp.locator("#pop.show").count() == 0)
+    pp.mouse.click(5, 5)
+    # multi-word drag selection -> phrase popup with mocked MyMemory translation
+    drag_select(pp, f'{AR} .w[data-w="sobering"]', f'{AR} .w[data-w="sobering"] + .w')
+    wait_phrase_pop(pp)
+    check("drag-select 2 words opens phrase popup", pp.inner_text("#phraseText") == "sobering message", pp.inner_text("#pop")[:100].replace("\n", " | "))
+    check("phrase popup shows mocked Chinese translation", pp.input_value("#phraseZh") == "发人深省的信息" and "MyMemory" in pp.inner_text("#pop"))
+    check("phrase popup has speak button + not a sheet on desktop", pp.locator("#pop [data-act=psay]").count() == 1 and not pp.evaluate("document.getElementById('pop').classList.contains('sheet')"))
+    pp.screenshot(path="/tmp/er_phrase_pop_desktop.png")
+    check("desktop popup placed below the selection", pp.evaluate("getSelection().getRangeAt(0).getBoundingClientRect().bottom <= document.getElementById('pop').getBoundingClientRect().top"))
+    pp.click("#pop [data-act=psay]")
+    pp.click("#pop [data-act=padd]")
+    sm = word(pp, "sobering message")
+    check("phrase saved with type=phrase, zh, source sentence, due today",
+          sm and sm["type"] == "phrase" and sm["zh"] == "发人深省的信息" and "delivered a sobering message" in sm["sentence"]
+          and sm["srs"]["stage"] == 0 and sm["srs"]["due"] == "2026-10-23" and sm["article"] == "2026-10-23", str(sm)[:200])
+    check("saved phrase highlighted in article", pp.locator(f"{AR} .w.ph").count() == 2)
+    check("popup now says 已在生词本", "已在生词本" in pp.inner_text("#pop [data-act=padd]"))
+    check("badge counts the phrase", pp.inner_text("#dueBadge") == "1")
+    pp.keyboard.press("Escape")
+    # translation failure -> user types the meaning
+    drag_select(pp, f'{AR} p .w[data-w="global"]', f'{AR} p .w[data-w="global"] + .w + .w')
+    wait_phrase_pop(pp)
+    check("failed translation shows message + empty editable box", pp.inner_text("#phraseText") == "global climate policy"
+          and "请自己填写" in pp.inner_text("#phraseStatus") and pp.input_value("#phraseZh") == "")
+    pp.click("#pop [data-act=padd]")
+    check("cannot add phrase without Chinese", word(pp, "global climate policy") is None)
+    pp.fill("#phraseZh", "全球气候政策")
+    pp.click("#pop [data-act=padd]")
+    check("user-typed Chinese saved", (word(pp, "global climate policy") or {}).get("zh") == "全球气候政策")
+    pp.keyboard.press("Escape")
+    # too long (triple-click a paragraph)
+    pp.locator(f"{AR} > p").nth(1).click(click_count=3)
+    pp.wait_for_function("document.querySelector('#pop.show.phrase')")
+    check("selection > 20 words -> 'too long' message, no add button", "太长" in pp.inner_text("#pop") and pp.locator("#pop [data-act=padd]").count() == 0)
+    pp.keyboard.press("Escape"); pp.mouse.click(5, 5)
+    # word double-click still a word lookup
+    pp.locator(f'{AR} .w[data-w="emissions"]').first.dblclick()
+    pp.wait_for_function("document.querySelector('#pop.show') && !document.querySelector('#pop .spinner')")
+    check("double-click still opens single-word lookup", "排放" in pp.inner_text("#pop") and pp.locator("#pop.phrase").count() == 0)
+    pp.keyboard.press("Escape")
+    # paste mode
+    pp.click('a[data-tab="paste"]'); pp.click("#btnSample1"); pp.click("#btnRead")
+    drag_select(pp, '#pasteReader .w[data-w="carbon"]', '#pasteReader .w[data-w="carbon"] + .w')
+    wait_phrase_pop(pp)
+    check("paste mode: phrase popup + translation", pp.inner_text("#phraseText") == "carbon emissions" and pp.input_value("#phraseZh") == "碳排放")
+    pp.click("#pop [data-act=padd]")
+    ce = word(pp, "carbon emissions")
+    check("paste-mode phrase saved with sentence + highlighted", ce and ce["type"] == "phrase" and "lowers carbon emissions" in ce["sentence"]
+          and pp.locator("#pasteReader .w.ph").count() == 2)
+    pp.keyboard.press("Escape")
+    pp.screenshot(path="/tmp/er_phrase_desktop.png")
+
+    # ---------- 10. manual add + edit meaning ----------
+    pp.click('a[data-tab="vocab"]'); pp.click("#manCard summary")
+    pp.fill("#manEn", "make ends meet"); pp.click("#manTrans")
+    pp.wait_for_function("document.getElementById('manZh').value!==''")
+    check("manual add: auto-translate fills Chinese", pp.input_value("#manZh") == "勉强维持生计")
+    pp.fill("#manNote", "Many students work part-time to make ends meet.")
+    pp.click("#manAdd")
+    me = word(pp, "make ends meet")
+    check("manual phrase saved (type, source, note)", me and me["type"] == "phrase" and me["source"] == "manual" and "part-time" in me["note"], str(me)[:160])
+    LONG = "The more you practise, the better you become."
+    pp.fill("#manEn", LONG); pp.fill("#manZh", "练得越多，就会越好。"); pp.click("#manAdd")
+    pp.fill("#manEn", "resilience"); pp.fill("#manZh", "韧性；恢复力"); pp.click("#manAdd")
+    check("manual long sentence + single word saved", (word(pp, LONG) or {}).get("type") == "phrase" and (word(pp, "resilience") or {}).get("type") == "word")
+    n_before = len(vocab(pp))
+    pp.fill("#manEn", "Make Ends Meet"); pp.fill("#manZh", "x"); pp.click("#manAdd")
+    check("manual duplicate (case-insensitive) rejected", len(vocab(pp)) == n_before)
+    pp.fill("#manEn", ""); pp.fill("#manZh", "")
+    pp.click('[data-edit="make ends meet"]'); pp.fill(".vedit-zh", "收支相抵；勉强维持生计"); pp.click('[data-save="make ends meet"]')
+    check("edit Chinese meaning of existing entry", word(pp, "make ends meet")["zh"] == "收支相抵；勉强维持生计" and "收支相抵" in pp.inner_text("#vocabList"))
+    pp.select_option("#vocabSrc", "phrase")
+    check("filter: only phrases (5)", pp.locator("#vocabList .vitem").count() == 5 and pp.locator("#vocabList .ptag").count() == 5)
+    pp.select_option("#vocabSrc", "all")
+    with pp.expect_download() as d:
+        pp.click("#btnExport")
+    csv = open(d.value.path(), encoding="utf-8-sig").read()
+    check("CSV includes phrases with type column", "make ends meet" in csv and "短语" in csv and "全球气候政策" in csv)
+
+    # ---------- 11. phrases in review ----------
+    pp.click('a[data-tab="review"]'); pp.wait_for_selector("#statDue")
+    pp.select_option("#optNewPer", "0"); pp.wait_for_selector("#btnStart")
+    force_type(pp, "sobering message", "en2zh")
+    force_type(pp, "make ends meet", "zh2en")
+    force_type(pp, "carbon emissions", "spell")
+    force_type(pp, LONG, "spell")
+    force_type(pp, "global climate policy", "spell")
+    qlog = []
+    run_session(pp, wrong={"global climate policy", LONG}, log=qlog)
+    by = {}
+    for e in qlog:
+        by.setdefault((e["word"], e["first"]), e)
+    first = lambda w: by.get((w, True), {})
+    check("phrase en2zh multiple choice", first("sobering message").get("type") == "en2zh" and first("sobering message").get("ok"))
+    zopts = first("make ends meet").get("opts") or []
+    check("phrase zh2en multiple choice, distractors are other phrases",
+          first("make ends meet").get("type") == "zh2en" and first("make ends meet").get("ok") and len(zopts) == 4 and all(" " in o for o in zopts), str(zopts))
+    check("phrase dictation: case/punctuation/extra spaces ignored", first("carbon emissions").get("type") == "spell" and first("carbon emissions").get("ok"))
+    check("short phrase wrong dictation shows word diff", first("global climate policy").get("type") == "spell" and not first("global climate policy").get("ok") and first("global climate policy").get("diff"))
+    check("long phrase (>6 words) uses word-order tiles", first(LONG).get("type") == "order" and not first(LONG).get("ok") and first(LONG).get("diff"), str(first(LONG)))
+    check("wrong phrases re-asked later in session", (("global climate policy", False) in by) and ((LONG, False) in by))
+    order_retry = [e for e in qlog if e["word"] == LONG and not e["first"] and e["type"] == "order"]
+    t2 = pp.evaluate("w=>{var v=ER.findWord(w);return SRS.qtype(v.word,{qn:0})}", LONG)
+    g = word(pp, "global climate policy"); L = word(pp, LONG); c = word(pp, "carbon emissions")
+    check("wrong phrase -> stage 0, due tomorrow, lapse counted", g["srs"]["stage"] == 0 and g["srs"]["due"] == "2026-10-24" and g["srs"]["lapses"] == 1
+          and L["srs"]["stage"] == 0 and L["srs"]["lapses"] == 1, str(g["srs"]))
+    check("correct phrase -> stage 1, due tomorrow", c["srs"]["stage"] == 1 and c["srs"]["due"] == "2026-10-24" and word(pp, "sobering message")["srs"]["stage"] == 1)
+    # order question answered correctly: force order again for day 2
+    goto(pp, "2026-10-24", "#/review"); pp.wait_for_selector("#btnStart")
+    force_type(pp, LONG, "spell"); force_type(pp, "carbon emissions", "en2zh")
+    qlog2 = []
+    run_session(pp, log=qlog2)
+    lo = [e for e in qlog2 if e["word"] == LONG]
+    check("word-order question answered correctly", lo and lo[0]["type"] == "order" and lo[0]["ok"] and lo[0]["placed"] == LONG, str(lo[:1]))
+    c = word(pp, "carbon emissions"); L = word(pp, LONG)
+    check("day 2: phrase stage 2 due +2d; reset phrase back to stage 1", c["srs"]["stage"] == 2 and c["srs"]["due"] == "2026-10-26"
+          and L["srs"]["stage"] == 1 and L["srs"]["due"] == "2026-10-25", f'{c["srs"]} / {L["srs"]}')
+
+    # ---------- 12. phrase backup round trip + legacy data ----------
+    goto(pp, "2026-10-24", "#/vocab"); pp.wait_for_selector("#btnBackup")
+    before = vocab(pp)
+    with pp.expect_download() as d:
+        pp.click("#btnBackup")
+    bpath = d.value.path()
+    bk = json.load(open(bpath, encoding="utf-8"))
+    check("backup contains phrases with type", sum(1 for x in bk["data"]["vocab"] if x.get("type") == "phrase") == 5)
+    pp.evaluate("localStorage.clear()"); pp.reload(); pp.wait_for_selector("#btnBackup")
+    with pp.expect_file_chooser() as fc:
+        pp.click("#btnImportMerge")
+    fc.value.set_files(bpath)
+    pp.wait_for_function(f"ER.getVocab().length==={len(before)}")
+    check("phrase backup round-trip identical", norm(vocab(pp)) == norm(before))
+    legacy = [{"word": "look forward to", "zh": "期待"}, {"word": "goal", "zh": "目标", "srs": {"stage": 2, "due": "2026-10-30"}}]
+    pp.evaluate("v=>localStorage.setItem('er_vocab',JSON.stringify(v))", legacy); pp.reload(); pp.wait_for_selector("#btnBackup")
+    lv = {x["word"]: x for x in vocab(pp)}
+    check("legacy data without type: phrase/word inferred, progress kept",
+          lv["look forward to"]["type"] == "phrase" and lv["goal"]["type"] == "word" and lv["goal"]["srs"]["stage"] == 2 and lv["look forward to"]["srs"]["due"] == "2026-10-24")
+    with pp.expect_file_chooser() as fc:
+        pp.click("#btnImportMerge")
+    fc.value.set_files(bpath)
+    pp.wait_for_function(f"ER.getVocab().length==={len(before) + 2}")
+    check("merge import of phrase backup into legacy data", word(pp, "make ends meet") is not None and word(pp, "look forward to") is not None)
+
+    # ---------- 13. mobile phrase flow ----------
+    mc = browser.new_context(viewport={"width": 390, "height": 760}, has_touch=True, is_mobile=True, device_scale_factor=2)
+    mock_routes(mc)
+    mq = mc.new_page(); attach(mq, "mobile-phrase")
+    mq.goto(f"{BASE}?today=2026-10-23#/read"); mq.wait_for_selector("#articleReader h2")
+    check("mobile: native text selection enabled in reader", mq.evaluate("getComputedStyle(document.getElementById('articleReader')).userSelect") != "none")
+    mq.locator('#articleReader .w[data-w="sobering"]').first.tap()
+    mq.wait_for_function("document.querySelector('#pop.show') && !document.querySelector('#pop .spinner')")
+    check("mobile: tap still opens word lookup", mq.locator("#pop.phrase").count() == 0 and "sobering" in mq.inner_text("#pop").lower())
+    mq.evaluate("ER.hidePop()")
+    # simulate long-press + dragging handles: selection made while finger is down, sheet only after touchend
+    SEL_JS = """([a,b])=>{var A=document.querySelectorAll('#articleReader .w[data-w="'+a+'"]'), B=document.querySelectorAll('#articleReader .w[data-w="'+b+'"]');
+      var x=A[A.length-1], y=B[B.length-1]; var r=document.createRange(); r.setStart(x.firstChild,0); r.setEnd(y.firstChild,y.firstChild.length);
+      var s=getSelection(); s.removeAllRanges(); s.addRange(r);}"""
+    mq.evaluate("document.querySelectorAll('#articleReader .w[data-w=\"summit\"]')[0].scrollIntoView({block:'end'})")
+    mq.evaluate("document.dispatchEvent(new Event('touchstart'))")
+    mq.evaluate(SEL_JS, ["climate", "summit"])
+    mq.wait_for_timeout(1000)
+    check("mobile: no popup while finger still down (native menu not fought)", mq.locator("#pop.show").count() == 0)
+    mq.evaluate("document.dispatchEvent(new Event('touchend'))")
+    wait_phrase_pop(mq)
+    check("mobile: phrase bottom sheet after touchend", mq.evaluate("document.getElementById('pop').classList.contains('sheet')") and mq.inner_text("#phraseText") == "climate summit"
+          and mq.input_value("#phraseZh") == "气候峰会")
+    check("mobile: selection scrolled above the sheet", mq.evaluate("getSelection().getRangeAt(0).getBoundingClientRect().bottom <= document.getElementById('pop').getBoundingClientRect().top"))
+    check("mobile: no horizontal overflow with sheet", mq.evaluate("document.documentElement.scrollWidth<=window.innerWidth+1"))
+    mq.screenshot(path="/tmp/er_mobile_phrase_sheet.png")
+    mq.tap("#pop [data-act=padd]")
+    check("mobile: phrase added", (word(mq, "climate summit") or {}).get("type") == "phrase" and mq.locator("#articleReader .w.ph").count() >= 2)
+    mq.evaluate("ER.hidePop(); getSelection().removeAllRanges()")
+    # long-press selecting a single word on the phone -> word lookup (old behaviour)
+    mq.evaluate(SEL_JS, ["goal", "goal"])
+    mq.wait_for_function("document.querySelector('#pop.show') && !document.querySelector('#pop .spinner')")
+    check("mobile: single-word long-press selection -> word lookup", mq.locator("#pop.phrase").count() == 0 and "goal" in mq.inner_text("#pop").lower())
+    mq.evaluate("ER.hidePop(); getSelection().removeAllRanges()")
+    # manual add + review on phone (word-order tiles by tapping)
+    mq.goto(f"{BASE}?today=2026-10-23#/vocab"); mq.wait_for_selector("#manCard")
+    mq.tap("#manCard summary"); mq.fill("#manEn", "Food grown close to consumers travels shorter distances")
+    mq.fill("#manZh", "在消费者附近种植的食物运输距离更短"); mq.tap("#manAdd")
+    check("mobile: manual add works", word(mq, "Food grown close to consumers travels shorter distances") is not None)
+    check("mobile: vocab page no horizontal overflow", mq.evaluate("document.documentElement.scrollWidth<=window.innerWidth+1"))
+    mq.screenshot(path="/tmp/er_mobile_vocab.png", full_page=True)
+    mq.evaluate("ER.settings.newPerDay=0;ER.saveSettings()")
+    force_type(mq, "Food grown close to consumers travels shorter distances", "spell")
+    mq.goto(f"{BASE}?today=2026-10-23#/review"); mq.wait_for_selector("#btnStart")
+    mlog, shots = [], {}
+    run_session(mq, log=mlog, tap=True, shots=shots)
+    mo = [e for e in mlog if e["type"] == "order"]
+    check("mobile: word-order question by tapping tiles", mo and mo[0]["ok"], str(mlog))
+    check("mobile: all phrase answers correct on phone", all(e["ok"] for e in mlog) and len(mlog) == 2, str(mlog))
+
+    # ---------- 14. live lookup (optional, real network) ----------
     if LIVE:
         lc = browser.new_context(); lp = lc.new_page(); attach(lp, "live")
         lp.goto(f"{BASE}#/read"); lp.wait_for_selector("#articleReader h2")

@@ -53,9 +53,22 @@
           <option value="az">A → Z</option><option value="due">按复习时间</option>
         </select>
         <select id="vocabSrc">
-          <option value="all">全部来源</option><option value="reading">阅读收藏</option><option value="cet">四六级新词</option>
+          <option value="all">全部</option><option value="word">只看单词</option><option value="phrase">只看短语 / 短句</option><option value="reading">阅读收藏</option><option value="manual">手动添加</option><option value="cet">四六级新词</option>
         </select>
       </div>
+      <details class="man" id="manCard">
+        <summary>✍️ 手动添加单词 / 短语 / 短句</summary>
+        <div class="man-form">
+          <label for="manEn">英文（单词、短语或 20 词以内的短句）</label>
+          <input type="text" id="manEn" placeholder="例如：carbon emissions、make ends meet" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+          <label for="manZh">中文意思</label>
+          <textarea id="manZh" rows="2" placeholder="自己输入，或点下面的「自动翻译」"></textarea>
+          <div class="row" style="margin-top:4px"><button id="manTrans">🌐 自动翻译</button><button id="manSay" title="朗读">🔊</button><span id="manStatus" class="hint"></span></div>
+          <label for="manNote">备注 / 例句（可选）</label>
+          <textarea id="manNote" rows="2" placeholder="例如：在哪里看到的、自己造的例句"></textarea>
+          <div class="row"><button class="primary" id="manAdd">＋ 加入生词本</button></div>
+        </div>
+      </details>
       <div id="vocabList"></div>
     </div>
     <div class="card">
@@ -82,13 +95,13 @@
           <button id="btnSample2">示例 2：睡眠与记忆</button>
           <button id="btnClear" class="danger">清空</button>
         </div>
-        <p class="hint">提示：阅读模式下，电脑端<b>双击</b>单词、手机端<b>轻点</b>单词，即可查看音标、中文释义、英文释义和例句。</p>
+        <p class="hint">提示：阅读模式下，电脑端<b>双击</b>单词、手机端<b>轻点</b>单词，即可查看音标、中文释义、英文释义和例句；<b>拖选多个词</b>（手机：长按后拖动选择柄）可收藏短语或短句。</p>
       </div>
     </div>
     <div id="readView" hidden>
       <div class="toolbar">
         <button id="btnEdit">← 编辑文章</button>
-        <span class="hint">双击 / 轻点单词查词 · <span class="hl-sample">黄色</span> = 生词本中的词</span>
+        <span class="hint">双击 / 轻点单词查词 · 拖选多个词收藏短语 · <span class="hl-sample">黄色</span> = 生词本中的词 · <span class="ph-sample">绿色下划线</span> = 已收藏的短语</span>
       </div>
       <div class="card"><article id="pasteReader" class="reader"></article></div>
     </div>

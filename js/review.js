@@ -3,7 +3,8 @@
 'use strict';
 var ER = window.ER, $ = ER.$, esc = ER.esc;
 var DUE_CAP = 30;
-var TYPE_NAME = {spell:'拼写', en2zh:'英译汉', zh2en:'汉译英'};
+var TYPE_NAME = {spell:'拼写', en2zh:'英译汉', zh2en:'汉译英', order:'连词成句'};
+var ORDER_OVER = 6;      // 超过 6 个词的短语 / 句子：拼写题改为「连词成句」
 var box = $('reviewBox');
 var S = null;            // 当前会话
 var cetLists = {};       // level -> list
@@ -16,6 +17,25 @@ function markSeen(w,how){ var s=seen(); s[w.toLowerCase()]=how; ER.lsSet('er_cet
 function shuffle(a){ for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;} return a; }
 function norm(s){ return String(s||'').toLowerCase().replace(/[’‘`]/g,"'").replace(/\s+/g,' ').trim(); }
 function shortZh(z){ z=String(z||''); return z.length>34? z.slice(0,34)+'…' : z; }
+function isPhrase(v){ return v.type==='phrase' || /\s/.test(String(v.word).trim()); }
+function tokens(s){ return String(s||'').trim().split(/\s+/).filter(Boolean); }
+/* 短语比较：忽略大小写、标点和多余空格（连字符当空格） */
+function normPhrase(s){ return String(s||'').toLowerCase().replace(/[’‘`]/g,"'").replace(/[-‐–—_\/]/g,' ').replace(/[^\p{L}\p{N}\s]+/gu,'').replace(/\s+/g,' ').trim(); }
+/* 逐词对比（LCS）：del = 写错 / 多写的词，ins = 漏写的词 */
+function diffHtml(user, answer){
+  var a=normPhrase(user).split(' ').filter(Boolean), b=normPhrase(answer).split(' ').filter(Boolean), m=a.length, n=b.length, L=[], i, j;
+  for(i=0;i<=m;i++){ L.push(new Array(n+1).fill(0)); }
+  for(i=m-1;i>=0;i--) for(j=n-1;j>=0;j--) L[i][j]= a[i]===b[j]? L[i+1][j+1]+1 : Math.max(L[i+1][j],L[i][j+1]);
+  var ua=[], ab=[]; i=0; j=0;
+  while(i<m&&j<n){
+    if(a[i]===b[j]){ ua.push(esc(a[i])); ab.push(esc(b[j])); i++; j++; }
+    else if(L[i+1][j]>=L[i][j+1]){ ua.push('<del>'+esc(a[i])+'</del>'); i++; }
+    else { ab.push('<ins>'+esc(b[j])+'</ins>'); j++; }
+  }
+  for(;i<m;i++) ua.push('<del>'+esc(a[i])+'</del>');
+  for(;j<n;j++) ab.push('<ins>'+esc(b[j])+'</ins>');
+  return '<div class="diff" id="diff"><div>你的答案：'+(ua.join(' ')||'（空）')+'</div><div>正确答案：'+ab.join(' ')+'</div><div class="hint">红色划线 = 写错 / 多写的词，绿色 = 漏掉的词</div></div>';
+}
 
 function loadLists(){
   var need=['cet4']; if(ER.settings.cet6) need.push('cet6');
@@ -64,7 +84,7 @@ function renderHome(msg){
   h+='<div class="row">'+(nothing?'<span class="feedback ok">🎉 今天的复习任务完成了！</span><button id="btnMoreNew">再学 10 个新词</button>':'<button class="primary big" id="btnStart">开始复习 →</button>')+'</div>';
   h+='<div class="row"><label class="opt"><input type="checkbox" id="optCet6"'+(ER.settings.cet6?' checked':'')+'> 新词包含六级（CET-6）</label>'+
      '<label class="opt">每天新词 <select id="optNewPer">'+[0,5,10,15,20,30].map(function(n){return '<option value="'+n+'"'+(+ER.settings.newPerDay===n?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label></div>';
-  h+='<p class="hint">复习间隔（艾宾浩斯遗忘曲线）：答对后 1 → 2 → 4 → 7 → 15 → 30 天再复习，连续答对 6 次即「已掌握」（之后每 60 天抽查一次）；答错则回到第 0 阶段，明天重来，并在本轮稍后再考一次。题型（拼写 / 英译汉 / 汉译英）每个词轮换。</p></div>';
+  h+='<p class="hint">复习间隔（艾宾浩斯遗忘曲线）：答对后 1 → 2 → 4 → 7 → 15 → 30 天再复习，连续答对 6 次即「已掌握」（之后每 60 天抽查一次）；答错则回到第 0 阶段，明天重来，并在本轮稍后再考一次。题型（拼写 / 英译汉 / 汉译英）每个词轮换；短语 / 短句同样参与复习：拼写题变成听写（不计大小写和标点），超过 6 个词的改为「连词成句」。</p></div>';
   h+='<div class="card"><h3 class="card-title">📅 未来 14 天复习量</h3>'+calendarHtml()+'</div>';
   box.innerHTML=h;
   var st=$('btnStart'); if(st) st.onclick=function(){ startSession(false); };
@@ -144,36 +164,50 @@ function renderCard(it){
 
 /* 选项干扰项 */
 function distractors(target, field, n){
-  var pool=[], seenTxt={}, tgtTxt=norm(target[field]);
-  seenTxt[tgtTxt]=1;
-  var add=function(o){ var t=field==='zh'?shortZh(o.zh):o.word; var k=norm(t); if(!t||seenTxt[k]) return; if(field==='zh'&&o.word.toLowerCase()===target.word.toLowerCase()) return; seenTxt[k]=1; pool.push(t); };
-  shuffle(ER.getVocab().slice()).slice(0,40).forEach(add);
+  var pool=[], pri=[], seenTxt={}, tgtTxt=norm(target[field]), tPh=isPhrase(target);
+  seenTxt[tgtTxt]=1; seenTxt[norm(field==='zh'?shortZh(target.zh||target.en):target.word)]=1;
+  var addTo=function(arr){ return function(o){ var t=field==='zh'?shortZh(o.zh):o.word; var k=norm(t); if(!t||seenTxt[k]) return; if(o===target||o.word.toLowerCase()===target.word.toLowerCase()) return; seenTxt[k]=1; arr.push(t); }; };
+  var add=addTo(pool);
+  // 短语题优先用其他短语做干扰项，不够再用单词；单词题不用短语（太容易排除）
+  if(tPh){ shuffle(ER.getVocab().filter(isPhrase)).forEach(addTo(pri)); if(pri.length>=n) return shuffle(pri).slice(0,n); }
+  shuffle(ER.getVocab().filter(function(o){return !isPhrase(o);})).slice(0,40).forEach(add);
   var cl=(cetLists.cet4||[]).concat(cetLists.cet6||[]);
   for(var i=0;i<60&&cl.length;i++) add(cl[Math.floor(Math.random()*cl.length)]);
   // 汉译英优先挑首字母相同的英文干扰项，更有区分度
   if(field==='word'){ var f=target.word[0].toLowerCase(); pool.sort(function(a,b){return (b[0].toLowerCase()===f)-(a[0].toLowerCase()===f);}); }
-  return shuffle(pool.slice(0, n+3)).slice(0,n);
+  return pri.concat(shuffle(pool.slice(0, n+3)).slice(0,n-pri.length));
 }
 
 /* 测试题 */
 function renderTest(it){
   var v=ER.findWord(it.word);
-  var type=SRS.qtype(v.word, v.srs);
-  it.type=type;
-  var tag='<span class="qtype">'+TYPE_NAME[type]+(it.first?(it.isNew?' · 新词测试':' · 阶段 '+v.srs.stage):' · 再练一次')+'</span>';
+  var type=SRS.qtype(v.word, v.srs), ph=isPhrase(v), toks=tokens(v.word);
+  if(type==='spell' && ph && toks.length>ORDER_OVER) type='order';
+  it.type=type; it.phrase=ph;
+  var tag='<span class="qtype">'+(ph?'短语 · ':'')+(type==='spell'&&ph?'听写':TYPE_NAME[type])+(it.first?(it.isNew?' · 新词测试':' · 阶段 '+v.srs.stage):' · 再练一次')+'</span>';
   var zh=v.zh||v.en||'（无释义）';
   var h='<div class="card">'+progressHtml()+'<div class="qcard" data-type="'+type+'" id="qCard">'+tag;
-  if(type==='spell'){
+  if(type==='spell' && ph){
+    h+='<div class="qzh" id="qPrompt">'+esc(zh)+'</div><div class="hint">听发音，写出这个短语（共 '+toks.length+' 个词，不计大小写和标点）<button id="btnSay">🔊 再听一次</button> <button id="btnHint">提示首字母</button></div>'+
+       '<div class="spell phrase"><input type="text" id="spellInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="输入英文短语"><button class="primary" id="btnCheck">确认</button></div>';
+  } else if(type==='spell'){
     h+='<div class="qzh" id="qPrompt">'+esc(zh)+'</div><div class="hint">听发音，拼写这个单词（共 '+v.word.length+' 个字符）<button id="btnSay">🔊 再听一次</button> <button id="btnHint">提示首字母</button></div>'+
        '<div class="spell"><input type="text" id="spellInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="输入英文单词"><button class="primary" id="btnCheck">确认</button></div>';
+  } else if(type==='order'){
+    var order=toks.map(function(t,i){return i;});
+    for(var tries=0;tries<6;tries++){ shuffle(order); if(normPhrase(order.map(function(i){return toks[i];}).join(' '))!==normPhrase(v.word)) break; }
+    h+='<div class="qzh" id="qPrompt">'+esc(zh)+'</div><div class="hint">听发音，按顺序点击下面的词，拼出这个句子 / 短语（点上面的词可放回）<button id="btnSay">🔊 再听一次</button></div>'+
+       '<div class="order-ans" id="orderAns"></div><div class="order-pool" id="orderPool">'+order.map(function(i){return '<button class="tile" data-i="'+i+'">'+esc(toks[i])+'</button>';}).join('')+'</div>'+
+       '<div class="row" style="justify-content:center"><button id="btnReset">↺ 重来</button><button class="primary" id="btnCheck">确认</button></div>';
+    it.answer=v.word;
   } else if(type==='en2zh'){
     var opts=shuffle([shortZh(zh)].concat(distractors(v,'zh',3)));
-    h+='<div class="qword" id="qPrompt">'+esc(v.word)+'</div><div class="ipa">'+esc(ER.fmtIpa(v.phonetic))+' <button id="btnSay">🔊</button></div>'+
+    h+='<div class="qword'+(ph?' qphrase':'')+'" id="qPrompt">'+esc(v.word)+'</div><div class="ipa">'+esc(ER.fmtIpa(v.phonetic))+' <button id="btnSay">🔊</button></div>'+
        '<div class="opts">'+opts.map(function(o){return '<button data-opt="'+esc(o)+'">'+esc(o)+'</button>';}).join('')+'</div>';
     it.answer=shortZh(zh);
   } else {
     var opts2=shuffle([v.word].concat(distractors(v,'word',3)));
-    h+='<div class="qzh" id="qPrompt">'+esc(zh)+'</div><div class="hint">选出对应的英文单词</div>'+
+    h+='<div class="qzh" id="qPrompt">'+esc(zh)+'</div><div class="hint">选出对应的英文'+(ph?'短语':'单词')+'</div>'+
        '<div class="opts">'+opts2.map(function(o){return '<button data-opt="'+esc(o)+'" style="font-family:Georgia,serif">'+esc(o)+'</button>';}).join('')+'</div>';
     it.answer=v.word;
   }
@@ -183,16 +217,34 @@ function renderTest(it){
   if(type==='spell'){
     ER.speak(v.word, v.audio);
     var inp=$('spellInput'); setTimeout(function(){ try{inp.focus();}catch(e){} },50);
-    $('btnHint').onclick=function(){ inp.placeholder=v.word[0]+' _ _ _'; this.disabled=true; };
+    $('btnHint').onclick=function(){ inp.placeholder= ph? toks.map(function(t){var c=t.replace(/^[^\p{L}\p{N}]+/u,''); return (c[0]||t[0])+'…';}).join(' ') : v.word[0]+' _ _ _'; this.disabled=true; };
     var check=function(){
       if(inp.readOnly) return;
-      var ok=norm(inp.value)===norm(v.word);
+      var ok= ph? normPhrase(inp.value)===normPhrase(v.word) : norm(inp.value)===norm(v.word);
       if(!inp.value.trim()){ inp.focus(); return; }
       inp.readOnly=true; inp.classList.add(ok?'right':'wrong'); $('btnCheck').disabled=true;
+      if(ph&&!ok) it.diff=diffHtml(inp.value, v.word);
       grade(it, v, ok);
     };
     $('btnCheck').onclick=check;
     inp.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); if(inp.readOnly){ var n=$('btnNext'); if(n&&!n.hidden) n.click(); } else check(); } });
+  } else if(type==='order'){
+    ER.speak(v.word, v.audio);
+    var ans=$('orderAns'), pool=$('orderPool');
+    var done=function(){ return !!ans.dataset.done; };
+    pool.onclick=function(e){ var t=e.target.closest('.tile'); if(t&&!done()) ans.appendChild(t); };
+    ans.onclick=function(e){ var t=e.target.closest('.tile'); if(t&&!done()) pool.appendChild(t); };
+    $('btnReset').onclick=function(){ if(done()) return; Array.prototype.slice.call(ans.querySelectorAll('.tile')).sort(function(a,b){return a.dataset.i-b.dataset.i;}).forEach(function(t){pool.appendChild(t);}); };
+    $('btnCheck').onclick=function(){
+      if(done()) return;
+      var left=pool.querySelectorAll('.tile').length;
+      if(left){ ER.toast('还有 '+left+' 个词没放'); return; }
+      var said=Array.prototype.map.call(ans.querySelectorAll('.tile'),function(t){return t.textContent;}).join(' ');
+      var ok=normPhrase(said)===normPhrase(v.word);
+      ans.dataset.done='1'; ans.classList.add(ok?'right':'wrong'); this.disabled=true; $('btnReset').disabled=true;
+      if(!ok) it.diff=diffHtml(said, v.word);
+      grade(it, v, ok);
+    };
   } else {
     Array.prototype.forEach.call(box.querySelectorAll('.opts button'),function(b){
       b.onclick=function(){
@@ -227,7 +279,8 @@ function grade(it, v, ok){
   } else {
     fb.className='feedback bad';
     fb.innerHTML='✗ 正确答案：<span class="answer">'+esc(v.word)+'</span> <span class="ipa">'+esc(ER.fmtIpa(v.phonetic))+'</span><div style="color:#0d3d8a">'+esc(v.zh||'')+'</div>'+
-      (v.sentence?'<div class="qex" style="font-size:14px">'+esc(v.sentence)+'</div>':'')+
+      (it.diff||'')+
+      (v.sentence?'<div class="qex" style="font-size:14px">'+esc(v.sentence)+'</div>':(v.note?'<div class="qexzh">📝 '+esc(v.note)+'</div>':''))+
       '<div class="hint">'+(it.first&&before>0?'进度已重置为阶段 0，':'')+'明天再复习；本轮稍后会再考一次</div>';
     // 本轮稍后再出现（最多重练 2 次）
     if(it.retry<2){
@@ -236,7 +289,7 @@ function grade(it, v, ok){
     }
   }
   var nb=$('btnNext'); nb.hidden=false; nb.onclick=advance;
-  if(ok && it.type!=='spell'){ /* 选择题答对：稍后自动进入下一题 */ setTimeout(function(){ if(S && S.queue[S.idx]===it && !nb.dataset.clicked){ nb.dataset.clicked='1'; advance(); } },900); nb.onclick=function(){ nb.dataset.clicked='1'; advance(); }; }
+  if(ok && it.type!=='spell' && it.type!=='order'){ /* 选择题答对：稍后自动进入下一题 */ setTimeout(function(){ if(S && S.queue[S.idx]===it && !nb.dataset.clicked){ nb.dataset.clicked='1'; advance(); } },900); nb.onclick=function(){ nb.dataset.clicked='1'; advance(); }; }
   else setTimeout(function(){ try{nb.focus();}catch(e){} },30);
 }
 
