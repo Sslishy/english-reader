@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-25",
+  "title": "AI at the Front Line: Faster Tuberculosis Screening",
+  "title_zh": "人工智能上前线：让结核病筛查更快",
+  "source_name": "Google Research Blog — “Bringing foundational models to the front lines of TB screening” (23 Oct 2026)",
+  "source_url": "https://research.google/blog/bringing-foundational-models-to-the-front-lines-of-tb-screening/",
+  "level": "B1–B2 · 雅思 5.5–6.5",
+  "summary_zh": "结核病仍是全球最致命的传染病之一，每年约夺去 123 万人的生命，很多病例因为缺少检查而没被发现。谷歌研究院 10 月 23 日介绍了它在结核病筛查上的进展：南非比勒陀利亚的医疗科技公司 Nexus AI 把谷歌的胸部 X 光算法做成了获得欧盟 CE（IIb 类）认证的诊断工具，最快 45 秒就能给出筛查结果，已在南非、塞拉利昂、科特迪瓦等国约 40 家医疗机构使用，90 多名医生用它看过 2.5 万多张 X 光片，最终诊断仍由医生决定。它甚至被带到南非一座金矿地下约 4 公里处离线筛查矿工。谷歌还开源了 MedSigLIP、MedGemma 等模型，印度尼西亚卫生部正用本国 X 光数据微调这些模型，目标是每年筛查 5000 万人，而且数据留在国内。需要注意：这些数字主要来自谷歌和合作方，印尼项目的效果还没有公开数据。",
+  "paragraphs": [
+    "Tuberculosis, usually called TB, is one of the oldest diseases known to humans, yet it is still one of the deadliest. According to Google Research, it kills an estimated 1.23 million people every year. The main problem is not a lack of medicine. It is that many people who are infected are never diagnosed, especially in poorer communities where doctors and medical equipment are in short supply.",
+    "One of the most common ways to find TB is to take an X-ray of a patient's chest. However, reading these images requires a trained specialist, and in some places patients may wait weeks for the result. This is where artificial intelligence can make a significant difference. On 23 October, Google Research described how its chest X-ray software has moved from the laboratory into real clinics.",
+    "The company worked with Nexus AI, a medical technology firm based in Pretoria, South Africa, which turned Google's algorithms into a certified diagnostic tool. The tool can screen a chest X-ray in as little as 45 seconds. It is now used in about 40 healthcare facilities in countries such as South Africa, Sierra Leone and Côte d'Ivoire, and more than 90 clinicians have used it to evaluate over 25,000 images. Importantly, the AI does not replace doctors: it highlights patients who need further tests, while health professionals still make the final decision. In one remarkable case, portable X-ray machines and offline AI were used to screen miners nearly four kilometres underground at a South African gold mine.",
+    "Google has also released open models, including MedSigLIP and MedGemma, so that governments can build their own tools. Indonesia's Ministry of Health is reportedly adapting these models using local X-ray data, with the ambitious goal of screening 50 million people a year. Because the models can run on local computers, sensitive patient data does not have to leave the country.",
+    "Experts note that most of these figures come from Google and its partners, and independent results are still limited. Even so, the project shows how technology could help health systems reach people who were previously overlooked. If diagnosis becomes faster and cheaper, a disease that has troubled humanity for thousands of years may finally become easier to control."
+  ],
+  "key_words": [
+    {
+      "word": "tuberculosis",
+      "phonetic": "/tjuːˌbɜːkjuˈləʊsɪs/",
+      "meaning_zh": "n. 结核病（常缩写为 TB）"
+    },
+    {
+      "word": "diagnose",
+      "phonetic": "/ˈdaɪəɡnəʊz/",
+      "meaning_zh": "v. 诊断"
+    },
+    {
+      "word": "screen",
+      "phonetic": "/skriːn/",
+      "meaning_zh": "v. 筛查；检查（是否患病）"
+    },
+    {
+      "word": "specialist",
+      "phonetic": "/ˈspeʃəlɪst/",
+      "meaning_zh": "n. 专科医生；专家"
+    },
+    {
+      "word": "in short supply",
+      "phonetic": "",
+      "meaning_zh": "短缺；供应不足"
+    },
+    {
+      "word": "certified",
+      "phonetic": "/ˈsɜːtɪfaɪd/",
+      "meaning_zh": "adj. 经认证的；有资质的"
+    },
+    {
+      "word": "clinician",
+      "phonetic": "/klɪˈnɪʃn/",
+      "meaning_zh": "n. 临床医生"
+    },
+    {
+      "word": "ambitious",
+      "phonetic": "/æmˈbɪʃəs/",
+      "meaning_zh": "adj. 雄心勃勃的；（目标）宏大的"
+    },
+    {
+      "word": "sensitive",
+      "phonetic": "/ˈsensətɪv/",
+      "meaning_zh": "adj. 敏感的；需保密的"
+    },
+    {
+      "word": "overlook",
+      "phonetic": "/ˌəʊvəˈlʊk/",
+      "meaning_zh": "v. 忽视；忽略"
+    }
+  ]
+}
