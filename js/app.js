@@ -28,10 +28,11 @@ var toast = ER.toast = function(msg){var t=$('toast');t.textContent=msg;t.classL
 var lsGet = ER.lsGet = function(k,d){try{var v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}};
 var lsSet = ER.lsSet = function(k,v,quiet){try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){if(!quiet)toast('本地存储已满或不可用，数据可能未保存');return false;}};
 function lsRaw(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
-function fetchJson(url,ms){
+function fetchJson(url,ms,opts){
   var ctl = ('AbortController' in window)? new AbortController():null;
   var timer = setTimeout(function(){ if(ctl) ctl.abort(); }, ms||9000);
-  return fetch(url, ctl?{signal:ctl.signal}:{}).then(function(r){
+  var o = opts? Object.assign({}, opts):{}; if(ctl) o.signal=ctl.signal;
+  return fetch(url, o).then(function(r){
     clearTimeout(timer);
     if(!r.ok){var e=new Error('HTTP '+r.status);e.status=r.status;throw e;}
     return r.json();
@@ -709,21 +710,91 @@ function fromMyMemory(w){
     return list.length? list.slice(0,4).join('；') : null;
   }).catch(function(e){ if(e.status===429) myMemoryQuotaOut=true; return null; });
 }
-/* 短语 / 句子翻译：MyMemory en|zh-CN（免 key，支持 CORS），结果缓存在 er_cache */
+/* 短语 / 句子翻译：依次尝试多个免 key、支持 CORS 的机器翻译（每个最多等 5 秒），成功结果缓存在 er_cache
+   顺序：有道（国内可直连）→ MyMemory → Google（国内通常连不上，放最后） */
 function decodeEntities(t){ try{ return new DOMParser().parseFromString('<!doctype html><body>'+t,'text/html').body.textContent||''; }catch(e){ return t; } }
+var TR_TIMEOUT=5000, trDown={};
+function cleanZh(t){ t=decodeEntities(String(t||'')).replace(/\s+/g,' ').trim(); return (/[\u4e00-\u9fff]/.test(t)&&t.length<=300)? t:null; }
+var TRANSLATORS=[
+  {id:'youdao',src:'有道机器翻译',run:function(text){
+    return fetchJson('https://aidemo.youdao.com/trans',TR_TIMEOUT,{method:'POST',body:new URLSearchParams({q:text,from:'en',to:'zh-CHS'})}).then(function(d){
+      return d&&String(d.errorCode)==='0'&&d.translation? cleanZh([].concat(d.translation).join('')) : null; });
+  }},
+  {id:'mymemory',src:'MyMemory 机器翻译',run:function(text){
+    if(myMemoryQuotaOut) return Promise.resolve(null);
+    var url='https://api.mymemory.translated.net/get?langpair=en|zh-CN&q='+encodeURIComponent(text)+(settings.email?'&de='+encodeURIComponent(settings.email):'');
+    return fetchJson(url,TR_TIMEOUT).then(function(d){
+      var t=d&&d.responseData&&d.responseData.translatedText;
+      if(!d) return null;
+      if(d.responseStatus==429||d.quotaFinished||/MYMEMORY WARNING/i.test(t||'')){ myMemoryQuotaOut=true; return null; }
+      return cleanZh(t);
+    },function(e){ if(e.status===429) myMemoryQuotaOut=true; throw e; });
+  }},
+  {id:'google',src:'Google 机器翻译',run:function(text){
+    return fetchJson('https://translate.googleapis.com/translate_a/t?client=dict-chrome-ex&sl=en&tl=zh-CN&q='+encodeURIComponent(text),TR_TIMEOUT).then(function(d){
+      if(!Array.isArray(d)) return null;
+      return cleanZh(d.map(function(x){ return Array.isArray(x)? x[0] : x; }).join(''));
+    });
+  }}
+];
+ER.TRANSLATORS = TRANSLATORS;
 function translateText(text){
   var k='t:'+keyOf(text);
   if(cache[k]) return Promise.resolve(cache[k]);
-  if(myMemoryQuotaOut) return Promise.resolve(null);
-  var url='https://api.mymemory.translated.net/get?langpair=en|zh-CN&q='+encodeURIComponent(text)+(settings.email?'&de='+encodeURIComponent(settings.email):'');
-  return fetchJson(url,9000).then(function(d){
-    var t=d&&d.responseData&&d.responseData.translatedText;
-    if(!d) return null;
-    if(d.responseStatus==429||d.quotaFinished||/MYMEMORY WARNING/i.test(t||'')){ myMemoryQuotaOut=true; return null; }
-    t=decodeEntities(String(t||'')).replace(/\s+/g,' ').trim();
-    if(!/[\u4e00-\u9fff]/.test(t)||t.length>200) return null;
-    var out={zh:t,src:'MyMemory 机器翻译'}; cachePut(k,out); return out;
-  }).catch(function(e){ if(e.status===429) myMemoryQuotaOut=true; return null; });
+  var i=0;
+  function next(){
+    if(i>=TRANSLATORS.length) return Promise.resolve(null);
+    var t=TRANSLATORS[i++];
+    if(trDown[t.id]&&Date.now()-trDown[t.id]<10*60*1000) return next();   // 连不上的服务 10 分钟内先跳过
+    return t.run(text).then(function(zh){
+      delete trDown[t.id];
+      if(!zh) return next();
+      var out={zh:zh,src:t.src}; cachePut(k,out); return out;
+    },function(e){ if(e&&(e.network||e.name==='AbortError'||e.status>=500)) trDown[t.id]=Date.now(); return next(); });
+  }
+  return next();
+}
+function resetTranslators(){ trDown={}; myMemoryQuotaOut=false; }
+
+/* 本文短语表 / 重点词：在线翻译之前先查（忽略大小写和标点；选区包含或被包含于某个短语也给出提示） */
+function phNorm(s){ return keyOf(s).replace(/-/g,' ').replace(/'/g,'').replace(/\s+/g,' ').trim(); }
+function phLoose(s){ return phNorm(s).split(' ').map(function(w){ return w.length>3? w.replace(/(ies|es|s)$/,''):w; }).join(' '); }
+function glossaryFor(art){
+  if(!art) return [];
+  var out=[];
+  (Array.isArray(art.phrases)?art.phrases:[]).forEach(function(p){ if(p&&p.text&&p.meaning_zh) out.push({text:String(p.text),zh:String(p.meaning_zh),src:'本文短语表'}); });
+  (Array.isArray(art.key_words)?art.key_words:[]).forEach(function(k){ if(k&&k.word&&k.meaning_zh) out.push({text:String(k.word),zh:String(k.meaning_zh),src:'本文重点词'}); });
+  return out;
+}
+function glossaryMatch(text, art){
+  var g=glossaryFor(art), n=phNorm(text), l=phLoose(text), res={exact:null,related:[]};
+  if(!n) return res;
+  var pad=function(s){ return ' '+s+' '; };
+  for(var i=0;i<g.length;i++){ var gn=phNorm(g[i].text), gl=phLoose(g[i].text);
+    if(gn===n||gl===l){ if(!res.exact) res.exact=g[i]; continue; }
+    if(gn.indexOf(' ')<0&&n.indexOf(' ')>=0) continue;   // 单个重点词只用于逐词提示，不当作相关短语
+    if(pad(l).indexOf(pad(gl))>=0||pad(gl).indexOf(pad(l))>=0) res.related.push(g[i]);
+  }
+  res.related=res.related.slice(0,4);
+  return res;
+}
+ER.glossaryMatch = function(text){ return glossaryMatch(text, currentArticle); };
+
+/* 整句翻译失败时，给出逐词中文意思作参考（本文重点词 → 四六级词库 → 查词缓存 → 在线查词） */
+var HINT_STOP={a:1,an:1,the:1,of:1,to:1,in:1,on:1,at:1,and:1,or:1,for:1,with:1,by:1,is:1,are:1,was:1,were:1,be:1,been:1,it:1,its:1,'this':1,that:1,as:1,from:1,but:1,not:1};
+function wordHints(text, art){
+  var words=[]; (String(text).match(/[A-Za-z][A-Za-z'’-]*/g)||[]).forEach(function(w){ var lw=w.toLowerCase().replace(/’/g,"'"); if(!HINT_STOP[lw]&&words.indexOf(lw)<0) words.push(lw); });
+  words=words.slice(0,8);
+  var kw={}; ((art&&art.key_words)||[]).forEach(function(k){ if(k&&k.word&&k.meaning_zh) kw[String(k.word).toLowerCase()]=k.meaning_zh; });
+  return loadAllCet().then(function(){
+    return Promise.all(words.map(function(w){
+      var cands=candidates(w);
+      for(var i=0;i<cands.length;i++){ if(kw[cands[i]]) return {w:w,zh:kw[cands[i]]}; }
+      var c=cetFor(cands); if(c&&c.zh) return {w:w,zh:c.zh};
+      if(cache[cands[0]]&&cache[cands[0]].zh) return {w:w,zh:cache[cands[0]].zh};
+      return lookup(w).then(function(r){ return {w:w,zh:r&&r.zh||''}; },function(){ return {w:w,zh:''}; });
+    }));
+  }).then(function(list){ return list.filter(function(x){ return x.zh; }).map(function(x){ return {w:x.w,zh:String(x.zh).split(/[；;]/).slice(0,2).join('；')}; }); });
 }
 /* 单词走完整查词链（四六级词库 / 维基词典 / MyMemory），短语走 MyMemory */
 ER.translate = function(text){
@@ -873,9 +944,10 @@ pop.addEventListener('click',function(e){
   if(b.classList.contains('pop-close')){hidePop();return;}
   var act=b.getAttribute('data-act');
   if(act==='say'){ speak(current.res?current.res.word:current.word, current.res&&current.res.audio); }
-  else if(act==='retry'){ dictApiDown=false; myMemoryQuotaOut=false; if(activeSpan) openFor(activeSpan); }
+  else if(act==='retry'){ dictApiDown=false; resetTranslators(); if(activeSpan) openFor(activeSpan); }
   else if(act==='psay'){ speak(current.word); }
-  else if(act==='ptrans'){ myMemoryQuotaOut=false; translatePhrasePop(); }
+  else if(act==='ptrans'){ resetTranslators(); translatePhrasePop(); }
+  else if(act==='puse'&&current&&current.phrase&&current.related){ var gx=current.related[+b.getAttribute('data-i')]; if(gx){ current.zh=gx.zh; current.src=gx.src+'：'+gx.text; current.dirty=true; renderPhrasePop(); var sv0=ER.findWord(current.word); if(sv0){ sv0.zh=gx.zh; saveVocab(); } } }
   else if(act==='padd'){
     var sv=ER.findWord(current.word);
     if(sv){ ER.removeWord(sv.word); toast('已从生词本移除'); }
@@ -920,11 +992,14 @@ function openPhrase(text, n, sentence, range, reader){
   activeRange=range; ++reqId;
   var saved=ER.findWord(text);
   current={phrase:true,word:text,n:n,sentence:sentence,zh:saved?saved.zh||'':'',src:saved?'生词本':'',tooLong:n>MAX_PHRASE_WORDS,
-    loading:false,failed:false,dirty:false,article:currentArticle&&reader.id==='articleReader'?currentArticle.date:undefined};
+    loading:false,failed:false,dirty:false,article:currentArticle&&reader.id==='articleReader'?currentArticle.date:undefined,related:[],hints:null};
+  var gm=current.article? glossaryMatch(text, currentArticle) : {exact:null,related:[]};
+  current.related=gm.related;
+  if(gm.exact&&!saved){ current.zh=gm.exact.zh; current.src=gm.exact.src; current.glossary=true; }
   renderPhrasePop();
   pop.classList.add('show','phrase'); placePop(range);
   if(pop.classList.contains('sheet')) keepAboveSheet(range);
-  if(!current.tooLong && !saved) translatePhrasePop();
+  if(!current.tooLong && !saved && !current.glossary) translatePhrasePop();
 }
 function translatePhrasePop(){
   var c=current; if(!c||!c.phrase) return;
@@ -932,8 +1007,10 @@ function translatePhrasePop(){
   translateText(c.word).then(function(t){
     if(my!==reqId||current!==c) return;
     c.loading=false;
-    if(t){ c.src=t.src; if(!c.dirty) c.zh=t.zh; } else c.failed=true;
-    renderPhrasePop();
+    if(t){ c.src=t.src; if(!c.dirty) c.zh=t.zh; renderPhrasePop(); return; }
+    c.failed=true; renderPhrasePop();
+    var art=c.article&&currentArticle&&currentArticle.date===c.article? currentArticle : null;
+    wordHints(c.word, art).then(function(h){ if(current!==c) return; c.hints=h; renderPhrasePop(); });
   });
 }
 function renderPhrasePop(){
@@ -950,7 +1027,9 @@ function renderPhrasePop(){
   h+='<div class="pop-actions"><button data-act="psay">🔊 朗读</button><button data-act="padd" class="'+(saved?'':'primary')+'">'+(saved?'✓ 已在生词本（点击移除）':'＋ 加入生词本')+'</button></div>';
   h+='<label class="pz-label" for="phraseZh">中文意思'+(c.src?'<span class="src">'+esc(c.src)+(saved?'':'，可修改')+'</span>':'')+'</label>';
   h+='<textarea id="phraseZh" rows="2" placeholder="'+(c.loading?'正在翻译…':'在这里输入 / 修改中文意思')+'">'+esc(c.zh)+'</textarea>';
-  h+='<div id="phraseStatus" class="pz-status '+(c.failed?'err':'muted')+'">'+(c.loading?'<span class="spinner"></span>正在自动翻译…':c.failed?'自动翻译暂不可用（网络或额度问题），请自己填写中文意思。<button data-act="ptrans">重试翻译</button>':(saved?'修改后自动保存':''))+'</div>';
+  h+='<div id="phraseStatus" class="pz-status '+(c.failed?'err':'muted')+'">'+(c.loading?'<span class="spinner"></span>正在自动翻译…':c.failed?'在线翻译暂时连不上（已试有道、MyMemory、Google），请参考下面的逐词意思自己填写。<button data-act="ptrans">重试翻译</button>':(saved?'修改后自动保存':''))+'</div>';
+  if(c.related&&c.related.length) h+='<div id="phraseRelated" class="pz-hint"><b>本文相关短语：</b>'+c.related.map(function(g,i){ return '<span class="pz-gl">'+esc(g.text)+' = '+esc(g.zh)+' <button data-act="puse" data-i="'+i+'">用这个</button></span>'; }).join('')+'</div>';
+  if(c.failed&&c.hints) h+='<div id="phraseHint" class="pz-hint"><b>逐词意思（仅供参考）：</b>'+(c.hints.length? c.hints.map(function(x){ return '<span class="pz-wd">'+esc(x.w)+' '+esc(x.zh)+'</span>'; }).join(' · ') : '没查到')+'</div>';
   if(c.sentence) h+='<div class="pz-sent">'+highlightIn(c.sentence,{word:c.word,type:'phrase'})+'</div>';
   pop.innerHTML=h;
   if(focused){ var ta=$('phraseZh'); if(ta) try{ta.focus();}catch(e){} }

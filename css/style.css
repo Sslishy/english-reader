@@ -91,6 +91,10 @@ body.sheet-open main{padding-bottom:55vh}
 #phraseZh{width:100%;min-height:0;height:auto;font:16px/1.5 -apple-system,"PingFang SC",sans-serif;color:#0d3d8a;border:1px solid var(--line);border-radius:8px;padding:6px 8px;resize:vertical;margin-top:2px}
 .pz-status{font-size:13px;min-height:4px;margin:2px 0}
 .pz-status button{padding:2px 8px;font-size:13px;margin-left:6px}
+.pz-hint{font-size:13px;color:#444;background:#f6f7fb;border-radius:6px;padding:6px 8px;margin:4px 0;line-height:1.6}
+.pz-hint .pz-gl{display:block}
+.pz-hint button{padding:1px 6px;font-size:12px;margin-left:4px}
+.pz-wd{white-space:nowrap}
 .pz-sent{font-family:Georgia,serif;font-style:italic;color:#555;font-size:14px;margin-top:6px}
 .pop-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding-right:28px}
 .pop-word{font-size:24px;font-weight:700;font-family:Georgia,serif}

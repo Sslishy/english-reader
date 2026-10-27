@@ -65,5 +65,107 @@
       "phonetic": "/ˈmeʒəmənt/",
       "meaning_zh": "n. 测量；衡量"
     }
+  ],
+  "phrases": [
+    {
+      "text": "climate change",
+      "meaning_zh": "气候变化"
+    },
+    {
+      "text": "rising seas",
+      "meaning_zh": "海平面上升"
+    },
+    {
+      "text": "failed harvests",
+      "meaning_zh": "歉收；收成不好"
+    },
+    {
+      "text": "serious consequence",
+      "meaning_zh": "严重后果"
+    },
+    {
+      "text": "almost completely ignored",
+      "meaning_zh": "几乎完全被忽视"
+    },
+    {
+      "text": "brain health",
+      "meaning_zh": "大脑健康"
+    },
+    {
+      "text": "extreme heat",
+      "meaning_zh": "极端高温"
+    },
+    {
+      "text": "is linked to",
+      "meaning_zh": "与……有关"
+    },
+    {
+      "text": "hospital admissions",
+      "meaning_zh": "住院人数；入院"
+    },
+    {
+      "text": "post-traumatic stress disorder",
+      "meaning_zh": "创伤后应激障碍"
+    },
+    {
+      "text": "air pollution",
+      "meaning_zh": "空气污染"
+    },
+    {
+      "text": "memory loss",
+      "meaning_zh": "记忆力减退"
+    },
+    {
+      "text": "cognitive decline",
+      "meaning_zh": "认知能力下降"
+    },
+    {
+      "text": "not shared equally",
+      "meaning_zh": "分担得不平均"
+    },
+    {
+      "text": "access to",
+      "meaning_zh": "获得……的机会/途径"
+    },
+    {
+      "text": "a disaster strikes",
+      "meaning_zh": "灾难发生"
+    },
+    {
+      "text": "in other words",
+      "meaning_zh": "换句话说"
+    },
+    {
+      "text": "low-income communities",
+      "meaning_zh": "低收入社区"
+    },
+    {
+      "text": "mental health",
+      "meaning_zh": "心理健康"
+    },
+    {
+      "text": "leave mental health out",
+      "meaning_zh": "把心理健康排除在外"
+    },
+    {
+      "text": "welfare losses",
+      "meaning_zh": "福利损失"
+    },
+    {
+      "text": "clean-air zones",
+      "meaning_zh": "清洁空气区"
+    },
+    {
+      "text": "cool down",
+      "meaning_zh": "使降温"
+    },
+    {
+      "text": "heat action plan",
+      "meaning_zh": "高温应对计划"
+    },
+    {
+      "text": "premature deaths",
+      "meaning_zh": "过早死亡"
+    }
   ]
 }

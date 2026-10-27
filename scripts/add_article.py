@@ -18,6 +18,11 @@ STR_FIELDS = ["date", "title", "title_zh", "source_name", "source_url", "level",
 KW_FIELDS = ["word", "phonetic", "meaning_zh"]
 
 
+def _norm(s):
+    s = s.lower().replace("\u2019", "'").replace("\u2018", "'")
+    return " ".join(re.sub(r"[^a-z0-9'\- ]", " ", s).split())
+
+
 def validate(a):
     """Return a list of error strings (empty list = valid)."""
     errs = []
@@ -56,7 +61,30 @@ def validate(a):
             for k in KW_FIELDS:
                 if not isinstance(w.get(k), str) or (k != "phonetic" and not w.get(k, "").strip()):
                     errs.append(f"key_words[{i}].{k} must be a string" + ("" if k == "phonetic" else " (non-empty)"))
-    extra = set(a) - set(STR_FIELDS) - {"paragraphs", "key_words"}
+    ph = a.get("phrases")
+    if ph is not None:
+        if not isinstance(ph, list):
+            errs.append("phrases must be a list (optional field)")
+        else:
+            seen = set()
+            for i, x in enumerate(ph):
+                if not isinstance(x, dict):
+                    errs.append(f"phrases[{i}] must be an object"); continue
+                for k in ("text", "meaning_zh"):
+                    if not isinstance(x.get(k), str) or not x.get(k, "").strip():
+                        errs.append(f"phrases[{i}].{k} must be a non-empty string")
+                t = x.get("text")
+                if isinstance(t, str) and t.strip():
+                    n = _norm(t)
+                    if n in seen:
+                        errs.append(f"phrases[{i}].text duplicates an earlier phrase: {t!r}")
+                    seen.add(n)
+                    if isinstance(p, list) and n not in _norm(" ".join(str(y) for y in p) + " " + str(a.get("title", ""))):
+                        print(f"warning: phrases[{i}] {t!r} does not appear in the article text", file=sys.stderr)
+                z = x.get("meaning_zh")
+                if isinstance(z, str) and z.strip() and not re.search(r"[\u4e00-\u9fff]", z):
+                    errs.append(f"phrases[{i}].meaning_zh must contain Chinese")
+    extra = set(a) - set(STR_FIELDS) - {"paragraphs", "key_words", "phrases"}
     if extra:
         print("warning: unknown fields kept as-is:", ", ".join(sorted(extra)), file=sys.stderr)
     return errs

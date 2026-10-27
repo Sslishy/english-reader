@@ -38,7 +38,15 @@ FAKE_ZH = {"emission": "排放；排放物", "sobering": "令人清醒的", "sce
            "climate summit": "气候峰会", "play a complementary role": "发挥补充作用"}
 
 
-def mock_routes(ctx):
+def mock_routes(ctx, translators=None):
+    """Mock dictionary + translation APIs.
+
+    translators: which online services succeed with FAKE_ZH. Default ("youdao",) so the
+    fallback chain is exercised but existing phrase tests stay stable. Pass () for total
+    online failure, or ("google",) to force a later service, etc.
+    """
+    ok = set(translators if translators is not None else ("youdao",))
+
     def dictapi(route):
         w = route.request.url.rsplit("/", 1)[-1].split("?")[0].lower()
         lemma = {"emissions": "emission"}.get(w, w)
@@ -52,12 +60,35 @@ def mock_routes(ctx):
     def mymemory(route):
         m = re.search(r"[?&]q=([^&]+)", route.request.url)
         w = unquote_plus(m.group(1)).lower() if m else ""
-        zh = FAKE_ZH.get(w, "")
+        zh = FAKE_ZH.get(w, "") if "mymemory" in ok else ""
         route.fulfill(status=200, content_type="application/json",
                       body=json.dumps({"responseStatus": 200, "responseData": {"translatedText": zh}, "matches": []}))
 
+    def youdao(route):
+        q = ""
+        try:
+            q = unquote_plus(re.search(r"(?:^|&)q=([^&]*)", route.request.post_data or "").group(1)).lower()
+        except Exception:
+            pass
+        if "youdao" in ok and q in FAKE_ZH:
+            route.fulfill(status=200, content_type="application/json",
+                          body=json.dumps({"errorCode": "0", "translation": [FAKE_ZH[q]], "query": q, "l": "en2zh-CHS"}))
+        else:
+            route.fulfill(status=200, content_type="application/json",
+                          body=json.dumps({"errorCode": "207", "translation": []}))
+
+    def google(route):
+        m = re.search(r"[?&]q=([^&]+)", route.request.url)
+        w = unquote_plus(m.group(1)).lower() if m else ""
+        if "google" in ok and w in FAKE_ZH:
+            route.fulfill(status=200, content_type="application/json", body=json.dumps([FAKE_ZH[w]]))
+        else:
+            route.fulfill(status=429, content_type="application/json", body='[]')
+
     ctx.route(re.compile(r"https://api\.dictionaryapi\.dev/.*"), dictapi)
     ctx.route(re.compile(r"https://api\.mymemory\.translated\.net/.*"), mymemory)
+    ctx.route(re.compile(r"https://aidemo\.youdao\.com/.*"), youdao)
+    ctx.route(re.compile(r"https://translate\.googleapis\.com/.*"), google)
     ctx.route(re.compile(r"https://(en|zh)\.wiktionary\.org/.*"), lambda r: r.fulfill(status=404, body="{}"))
     ctx.route(re.compile(r"https://(dict\.youdao\.com|commons\.wikimedia\.org)/.*"), lambda r: r.fulfill(status=204, body=""))
 
@@ -357,7 +388,7 @@ with sync_playwright() as p:
     drag_select(pp, f'{AR} .w[data-w="sobering"]', f'{AR} .w[data-w="sobering"] + .w')
     wait_phrase_pop(pp)
     check("drag-select 2 words opens phrase popup", pp.inner_text("#phraseText") == "sobering message", pp.inner_text("#pop")[:100].replace("\n", " | "))
-    check("phrase popup shows mocked Chinese translation", pp.input_value("#phraseZh") == "发人深省的信息" and "MyMemory" in pp.inner_text("#pop"))
+    check("phrase popup shows mocked Chinese translation", pp.input_value("#phraseZh") == "发人深省的信息" and "机器翻译" in pp.inner_text("#pop"))
     check("phrase popup has speak button + not a sheet on desktop", pp.locator("#pop [data-act=psay]").count() == 1 and not pp.evaluate("document.getElementById('pop').classList.contains('sheet')"))
     pp.screenshot(path="/tmp/er_phrase_pop_desktop.png")
     check("desktop popup placed below the selection", pp.evaluate("getSelection().getRangeAt(0).getBoundingClientRect().bottom <= document.getElementById('pop').getBoundingClientRect().top"))
@@ -375,7 +406,7 @@ with sync_playwright() as p:
     drag_select(pp, f'{AR} p .w[data-w="global"]', f'{AR} p .w[data-w="global"] + .w + .w')
     wait_phrase_pop(pp)
     check("failed translation shows message + empty editable box", pp.inner_text("#phraseText") == "global climate policy"
-          and "请自己填写" in pp.inner_text("#phraseStatus") and pp.input_value("#phraseZh") == "")
+          and ("请自己填写" in pp.inner_text("#phraseStatus") or "请参考" in pp.inner_text("#phraseStatus")) and pp.input_value("#phraseZh") == "")
     pp.click("#pop [data-act=padd]")
     check("cannot add phrase without Chinese", word(pp, "global climate policy") is None)
     pp.fill("#phraseZh", "全球气候政策")
@@ -699,6 +730,76 @@ with sync_playwright() as p:
     A.click("#btnSyncOff")
     check("disconnect removes token, keeps data", A.evaluate("localStorage.getItem('er_sync_token')") is None and "offline word" in words(A) and A.locator("#syncSetup").is_visible())
     ca.close(); cb.close()
+
+    # ---------- 16. glossary + translation fallbacks ----------
+    gc = browser.new_context(accept_downloads=True, viewport={"width": 1100, "height": 900})
+    mock_routes(gc, translators=())   # all online translators fail
+    gp = gc.new_page(); attach(gp, "glossary")
+    goto(gp, "2026-10-27", "#/read/2026-10-27"); gp.wait_for_selector("#articleReader h2")
+    AR27 = "#articleReader"
+    drag_select(gp, f'{AR27} .w[data-w="failed"]', f'{AR27} .w[data-w="harvests"]')
+    wait_phrase_pop(gp)
+    check("glossary: exact phrase fills Chinese offline",
+          gp.input_value("#phraseZh") == "歉收；收成不好" and "本文短语表" in gp.inner_text("#pop")
+          and "请参考" not in gp.inner_text("#pop") and "暂不可用" not in gp.inner_text("#pop"), gp.inner_text("#pop")[:200].replace("\n"," | "))
+    gp.mouse.click(5, 5); gp.wait_for_timeout(200)
+    # partial / related: select "rising seas" covered by glossary; then a longer selection containing it
+    drag_select(gp, f'{AR27} .w[data-w="rising"]', f'{AR27} .w[data-w="seas"]')
+    wait_phrase_pop(gp)
+    check("glossary: rising seas exact", gp.input_value("#phraseZh") == "海平面上升" and "本文短语表" in gp.inner_text("#pop"))
+    gp.mouse.click(5, 5); gp.wait_for_timeout(200)
+    # selection contained in glossary phrase: "extreme heat is" is not exact; related may include extreme heat
+    # select a phrase NOT in glossary and NOT in FAKE_ZH -> online fails -> per-word hints
+    drag_select(gp, f'{AR27} .w[data-w="hospital"]', f'{AR27} .w[data-w="admissions"]')
+    wait_phrase_pop(gp)
+    # "hospital admissions" IS in glossary — use a non-glossary selection
+    gp.mouse.click(5, 5); gp.wait_for_timeout(200)
+    drag_select(gp, f'{AR27} .w[data-w="completely"]', f'{AR27} .w[data-w="ignored"]')
+    wait_phrase_pop(gp)
+    # "almost completely ignored" is in glossary as exact if we select all three; select just "completely ignored"
+    txt = gp.inner_text("#phraseText")
+    if txt == "almost completely ignored":
+        check("glossary: almost completely ignored exact", "几乎完全被忽视" in gp.input_value("#phraseZh"))
+    else:
+        # related tip or online fail with hints
+        status = gp.inner_text("#phraseStatus") + gp.inner_text("#pop")
+        check("non-glossary selection: related tip or fail+hints",
+              ("本文相关短语" in status) or ("请参考" in status) or ("逐词意思" in status) or gp.input_value("#phraseZh") != "",
+              status[:180].replace("\n"," | "))
+    # total online failure + per-word hints via paste (no article glossary)
+    gp.evaluate("()=>{try{window.getSelection().removeAllRanges();}catch(e){} var p=document.getElementById('pop'); if(p){p.classList.remove('show','phrase'); p.innerHTML='';}}")
+    goto(gp, "2026-10-27", "#/paste"); gp.wait_for_selector("#src")
+    gp.fill("#src", "xyzzypq qwertyuiop asdfghjkl.")
+    gp.click("#btnRead", force=True); gp.wait_for_selector("#pasteReader .w")
+    drag_select(gp, '#pasteReader .w[data-w="xyzzypq"]', '#pasteReader .w[data-w="asdfghjkl"]')
+    wait_phrase_pop(gp)
+    gp.wait_for_function("document.querySelector('#phraseHint') || (document.querySelector('#phraseStatus') && document.querySelector('#phraseStatus').classList.contains('err'))", timeout=15000)
+    check("all translators fail: shows Chinese hint message + retry",
+          "请参考" in gp.inner_text("#phraseStatus") and gp.locator("#pop [data-act=ptrans]").count() == 1
+          and gp.input_value("#phraseZh") == "", gp.inner_text("#pop")[:220].replace("\n"," | "))
+    check("all translators fail: per-word hint box rendered", gp.locator("#phraseHint").count() == 1)
+    # fallback order: only google succeeds
+    gc.close()
+    gc2 = browser.new_context(viewport={"width": 1100, "height": 900})
+    mock_routes(gc2, translators=("google",))
+    gp2 = gc2.new_page(); attach(gp2, "fallback-google")
+    goto(gp2, "2026-10-23", "#/paste"); gp2.wait_for_selector("#src")
+    gp2.evaluate("()=>{var p=document.getElementById('pop'); if(p) p.classList.remove('show','phrase');}")
+    gp2.fill("#src", "The climate summit starts soon.")
+    gp2.click("#btnRead"); gp2.wait_for_selector("#pasteReader .w")
+    drag_select(gp2, '#pasteReader .w[data-w="climate"]', '#pasteReader .w[data-w="summit"]')
+    wait_phrase_pop(gp2)
+    check("fallback: Youdao+MyMemory fail, Google succeeds",
+          gp2.input_value("#phraseZh") == "气候峰会" and "Google" in gp2.inner_text("#pop"),
+          gp2.inner_text("#pop")[:180].replace("\n"," | "))
+    # related tip: select "sobering message" while glossary has "delivered a sobering message"
+    goto(gp2, "2026-10-23", "#/read/2026-10-23"); gp2.wait_for_selector("#articleReader h2")
+    drag_select(gp2, '#articleReader .w[data-w="sobering"]', '#articleReader .w[data-w="sobering"] + .w')
+    wait_phrase_pop(gp2)
+    check("glossary related tip for sobering message",
+          "本文相关短语" in gp2.inner_text("#pop") and "delivered a sobering message" in gp2.inner_text("#pop"),
+          gp2.inner_text("#pop")[:220].replace("\n"," | "))
+    gc2.close()
 
     # ---------- 14. live lookup (optional, real network) ----------
     if LIVE:
