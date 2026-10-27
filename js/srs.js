@@ -7,7 +7,7 @@
   var INTERVALS = [1, 2, 4, 7, 15, 30];
   var MAX_STAGE = INTERVALS.length;      // 6 = mastered
   var MASTERED_INTERVAL = 60;
-  var TYPES = ['spell', 'en2zh', 'zh2en'];
+  var TYPES = ['spell', 'en2zh', 'zh2en', 'cloze', 'gaps'];
   function pad(n) { return String(n).padStart(2, '0'); }
   function parse(ymd) { var p = String(ymd).split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]); }
   function fmt(ms) { var d = new Date(ms); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
@@ -53,8 +53,8 @@
     return out;
   }
   function hash(s) { var h = 0; s = String(s); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }
-  /* 每个词的题型按 拼写 → 英译汉 → 汉译英 轮换；起点由单词决定，使同一轮里题型混合 */
-  function qtype(word, srs) { return TYPES[(hash(word) + ((srs && srs.qn) || 0)) % 3]; }
+  /* 每个词的题型按 拼写 → 英译汉 → 汉译英 → 句子填空 → 补全字母 轮换；起点由单词决定 */
+  function qtype(word, srs) { return TYPES[(hash(word) + ((srs && srs.qn) || 0)) % TYPES.length]; }
   function stageLabel(srs, today) {
     if (!srs) return '';
     if (srs.stage >= MAX_STAGE) return '已掌握';

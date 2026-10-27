@@ -3,7 +3,7 @@
 'use strict';
 var ER = window.ER, $ = ER.$, esc = ER.esc;
 var DUE_CAP = 30;
-var TYPE_NAME = {spell:'拼写', en2zh:'英译汉', zh2en:'汉译英', order:'连词成句'};
+var TYPE_NAME = {spell:'拼写', en2zh:'英译汉', zh2en:'汉译英', order:'连词成句', cloze:'句子填空', gaps:'补全字母'};
 var ORDER_OVER = 6;      // 超过 6 个词的短语 / 句子：拼写题改为「连词成句」
 var box = $('reviewBox');
 var S = null;            // 当前会话
@@ -92,6 +92,9 @@ function pickNew(n){
 ER.cetHash = cetHash;
 ER.cetEligible = cetEligible;
 ER.pickNewCet = function(n){ return loadLists().then(function(){ return pickNew(n); }); };
+ER.gapMask = function(text, stage, day){ return gapMask(text, stage, day); };
+ER.resolveSentence = resolveSentence;
+ER.clozeBlank = clozeBlank;
 function counts(){
   var v=ER.getVocab(), t=today();
   var due=v.filter(function(x){return SRS.isDue(x.srs,t);}).length;
@@ -120,7 +123,7 @@ function renderHome(msg){
   h+='<div class="row">'+(nothing?'<span class="feedback ok">🎉 今天的复习任务完成了！</span><button id="btnMoreNew">再学 10 个新词</button>':'<button class="primary big" id="btnStart">开始复习 →</button>')+'</div>';
   h+='<div class="row"><label class="opt"><input type="checkbox" id="optCet6"'+(ER.settings.cet6?' checked':'')+'> 新词包含六级（CET-6）</label>'+
      '<label class="opt">每天新词 <select id="optNewPer">'+[0,5,10,15,20,30].map(function(n){return '<option value="'+n+'"'+(+ER.settings.newPerDay===n?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label></div>';
-  h+='<p class="hint">复习间隔（艾宾浩斯遗忘曲线）：答对后 1 → 2 → 4 → 7 → 15 → 30 天再复习，连续答对 6 次即「已掌握」（之后每 60 天抽查一次）；答错则回到第 0 阶段，明天重来，并在本轮稍后再考一次。题型（拼写 / 英译汉 / 汉译英）每个词轮换；短语 / 短句同样参与复习：拼写题变成听写（不计大小写和标点），超过 6 个词的改为「连词成句」。</p></div>';
+  h+='<p class="hint">复习间隔（艾宾浩斯遗忘曲线）：答对后 1 → 2 → 4 → 7 → 15 → 30 天再复习，连续答对 6 次即「已掌握」（之后每 60 天抽查一次）；答错则回到第 0 阶段，明天重来，并在本轮稍后再考一次。题型（拼写 / 英译汉 / 汉译英 / 句子填空 / 补全字母）每个词轮换；短语 / 短句同样参与复习：拼写题变成听写（不计大小写和标点），超过 6 个词的改为「连词成句」。句子填空会挖去语境句中的目标词；补全字母保留首字母，按阶段隐藏其余字母。</p></div>';
   h+='<div class="card"><h3 class="card-title">📅 未来 14 天复习量</h3>'+calendarHtml()+'</div>';
   box.innerHTML=h;
   var st=$('btnStart'); if(st) st.onclick=function(){ startSession(false); };
@@ -132,7 +135,7 @@ function renderHome(msg){
 /* ---------- 会话 ---------- */
 function startSession(extraNew){
   box.innerHTML='<div class="card"><p class="muted"><span class="spinner"></span>正在准备今天的单词…</p></div>';
-  loadLists().then(function(){
+  Promise.all([loadLists(), ensureExamples()]).then(function(){
     var t=today();
     var due=SRS.dueList(ER.getVocab(), t, DUE_CAP);
     var c=counts();
@@ -198,6 +201,137 @@ function renderCard(it){
   };
 }
 
+
+/* ---------- 例句来源（句子填空） ---------- */
+var exCache = {};   // level -> {wordLower: {en,zh}}
+function loadExamples(level){
+  var cur=exCache[level];
+  if(cur && typeof cur.then!=='function') return Promise.resolve(cur);
+  if(cur && typeof cur.then==='function') return cur;
+  exCache[level] = ER.fetchJson('data/examples-'+level+'.json',20000).then(function(d){
+    var ex=(d && d.examples) || {};
+    exCache[level]=ex;
+    return ex;
+  }).catch(function(){ exCache[level]={}; return {}; });
+  return exCache[level];
+}
+function ensureExamples(){
+  return Promise.all([loadExamples('cet4'), loadExamples('cet6')]);
+}
+function cetEntry(w){
+  var k=String(w||'').toLowerCase();
+  var lists=[cetLists.cet4, cetLists.cet6];
+  for(var i=0;i<lists.length;i++){ var L=lists[i]||[]; for(var j=0;j<L.length;j++){ if(L[j].word.toLowerCase()===k) return L[j]; } }
+  return null;
+}
+function exampleLookup(w){
+  var k=String(w||'').toLowerCase();
+  var levels=['cet4','cet6'];
+  for(var i=0;i<levels.length;i++){
+    var p=exCache[levels[i]];
+    if(p && typeof p.then!=='function' && p[k]) return p[k];
+  }
+  return null;
+}
+/** Resolve {en, zh, src} for cloze; null if none. */
+function resolveSentence(v){
+  if(!v) return null;
+  if(v.sentence && String(v.sentence).trim()){
+    return {en:String(v.sentence).trim(), zh:String(v.sentence_zh||'').trim(), src:'收藏语境'};
+  }
+  var ce=cetEntry(v.word);
+  if(ce && ce.ex) return {en:ce.ex, zh:ce.exzh||'', src:'四六级例句'};
+  var ex=exampleLookup(v.word);
+  if(ex && ex.en) return {en:ex.en, zh:ex.zh||'', src:'补充例句'};
+  return null;
+}
+function simpleForms(word){
+  var w=String(word||''), out=[w], low=w.toLowerCase();
+  if(!/\s/.test(w) && /^[A-Za-z][A-Za-z'-]*$/.test(w)){
+    var base=low;
+    ['s','es','ed','ing','er','est','ly'].forEach(function(suf){ out.push(base+suf); });
+    if(base.endsWith('e')){ out.push(base+'s'); out.push(base+'d'); out.push(base.slice(0,-1)+'ing'); }
+    else if(base.endsWith('y') && base.length>2 && !/[aeiou]y$/.test(base)){
+      out.push(base.slice(0,-1)+'ies'); out.push(base.slice(0,-1)+'ied');
+    } else {
+      out.push(base+'s');
+      if(/[aeiou][bcdfghjklmnpqrstvwxyz]$/.test(base)) out.push(base+base.slice(-1)+'ed', base+base.slice(-1)+'ing');
+      else { out.push(base+'ed'); out.push(base+'ing'); }
+    }
+  }
+  return out;
+}
+/** Find which surface form of the target appears in the sentence; return {form, start, end, htmlBlank, accept}. */
+function clozeBlank(v, sentEn){
+  var en=String(sentEn||'');
+  if(!en) return null;
+  var cands=[];
+  if(isPhrase(v)){
+    cands.push(v.word);
+    tokens(v.word).forEach(function(t){ if(/[A-Za-z]/.test(t) && t.length>2) cands.push(t); });
+  } else {
+    cands=cands.concat(simpleForms(v.word));
+    (v.forms||[]).forEach(function(f){ cands=cands.concat(simpleForms(f)); });
+  }
+  // unique, longer first
+  var seen={}, list=[];
+  cands.forEach(function(c){ var k=c.toLowerCase(); if(!k||seen[k]) return; seen[k]=1; list.push(c); });
+  list.sort(function(a,b){ return b.length-a.length; });
+  for(var i=0;i<list.length;i++){
+    var form=list[i];
+    var re=new RegExp('(^|[^A-Za-z])('+form.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')(?![A-Za-z])','i');
+    var m=re.exec(en);
+    if(m){
+      var start=m.index+m[1].length, end=start+m[2].length, surface=m[2];
+      var blankHtml=esc(en.slice(0,start))+'<span class="cloze-blank" id="clozeBlank">______</span>'+esc(en.slice(end));
+      return {form:surface, start:start, end:end, html:blankHtml, accept:surface};
+    }
+  }
+  return null;
+}
+
+/* ---------- 补全字母 ---------- */
+function gapMask(text, stage, day){
+  /* Keep first letter of each word; hide ~40–60% of the rest (more at higher stages). Deterministic per word+day. */
+  var ratio=0.4+0.2*Math.min(Math.max(+stage||0,0),5)/5;
+  var seed=SRS.hash(String(text).toLowerCase()+'|'+String(day||''));
+  var out=[], hide=[], i, ch, rnd, letters=[], letterIdx=[];
+  for(i=0;i<text.length;i++){
+    ch=text.charAt(i);
+    if(/[A-Za-z]/.test(ch)){ letters.push(i); }
+  }
+  // group by words (split on non-letters)
+  var words=[], cur=null;
+  for(i=0;i<text.length;i++){
+    if(/[A-Za-z]/.test(text.charAt(i))){
+      if(!cur){ cur={start:i, idx:[]}; words.push(cur); }
+      cur.idx.push(i);
+    } else cur=null;
+  }
+  var hideSet={};
+  words.forEach(function(w,wi){
+    var idxs=w.idx.slice(1); // keep first letter
+    var nHide=Math.round(idxs.length*ratio);
+    if(idxs.length && nHide<1 && ratio>=0.4) nHide=1;
+    if(nHide>idxs.length) nHide=idxs.length;
+    // pick deterministic subset
+    var pool=idxs.slice(), picks=[];
+    for(var k=0;k<nHide;k++){
+      seed=(seed*1103515245+12345)&0x7fffffff;
+      var j=seed%pool.length;
+      picks.push(pool.splice(j,1)[0]);
+    }
+    picks.forEach(function(p){ hideSet[p]=1; });
+  });
+  var gaps=[];
+  for(i=0;i<text.length;i++){
+    ch=text.charAt(i);
+    if(hideSet[i]){ gaps.push({i:i, ch:ch}); out.push('_'); hide.push(true); }
+    else { out.push(ch); hide.push(false); }
+  }
+  return {display:out.join(''), hide:hide, gaps:gaps, text:text};
+}
+
 /* 选项干扰项 */
 function distractors(target, field, n){
   var pool=[], pri=[], seenTxt={}, tgtTxt=norm(target[field]), tPh=isPhrase(target);
@@ -215,10 +349,25 @@ function distractors(target, field, n){
 }
 
 /* 测试题 */
+function pickType(v, it){
+  var ph=isPhrase(v), toks=tokens(v.word);
+  var type=SRS.qtype(v.word, v.srs);
+  if(type==='spell' && ph && toks.length>ORDER_OVER) type='order';
+  // 句子填空需要例句；没有则轮到下一题型
+  if(type==='cloze'){
+    var sent=resolveSentence(v);
+    if(!sent || !clozeBlank(v, sent.en)){
+      var alt=['spell','en2zh','zh2en','gaps'];
+      type=alt[(SRS.hash(v.word)+((v.srs&&v.srs.qn)||0))%alt.length];
+      if(type==='spell' && ph && toks.length>ORDER_OVER) type='order';
+    }
+  }
+  return type;
+}
 function renderTest(it){
   var v=ER.findWord(it.word);
-  var type=SRS.qtype(v.word, v.srs), ph=isPhrase(v), toks=tokens(v.word);
-  if(type==='spell' && ph && toks.length>ORDER_OVER) type='order';
+  var ph=isPhrase(v), toks=tokens(v.word);
+  var type=pickType(v, it);
   it.type=type; it.phrase=ph;
   var tag='<span class="qtype">'+(ph?'短语 · ':'')+(type==='spell'&&ph?'听写':TYPE_NAME[type])+(it.first?(it.isNew?' · 新词测试':' · 阶段 '+v.srs.stage):' · 再练一次')+'</span>';
   var zh=v.zh||v.en||'（无释义）';
@@ -236,6 +385,28 @@ function renderTest(it){
        '<div class="order-ans" id="orderAns"></div><div class="order-pool" id="orderPool">'+order.map(function(i){return '<button class="tile" data-i="'+i+'">'+esc(toks[i])+'</button>';}).join('')+'</div>'+
        '<div class="row" style="justify-content:center"><button id="btnReset">↺ 重来</button><button class="primary" id="btnCheck">确认</button></div>';
     it.answer=v.word;
+  } else if(type==='cloze'){
+    var sent=resolveSentence(v), blank=clozeBlank(v, sent.en);
+    it.answer=blank.accept; it.baseWord=v.word; it.sentZh=sent.zh; it.sentSrc=sent.src;
+    h+='<div class="qzh" id="qPrompt">'+esc(zh)+'</div>'+
+       '<div class="hint">根据句子写出空缺的英文'+(ph?'短语':'单词')+'（填句子里出现的形式） · '+esc(sent.src)+'</div>'+
+       '<div class="cloze-sent" id="clozeSent">'+blank.html+'</div>'+
+       (sent.zh?'<div class="qexzh" id="clozeZh">'+esc(sent.zh)+'</div>':'')+
+       '<div class="spell cloze"><input type="text" id="clozeInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="填入空缺内容"><button class="primary" id="btnCheck">确认</button></div>';
+  } else if(type==='gaps'){
+    var mask=gapMask(v.word, v.srs.stage, today());
+    it.answer=v.word; it.gaps=mask.gaps;
+    h+='<div class="qzh" id="qPrompt">'+esc(zh)+'</div>'+
+       '<div class="hint">补全缺失的字母（首字母已给出；也可在下方整词输入）<button id="btnSay">🔊 发音</button></div>'+
+       '<div class="gaps" id="gapsBox" aria-label="补全字母">';
+    for(var gi=0;gi<mask.text.length;gi++){
+      var ch=mask.text.charAt(gi);
+      if(mask.hide[gi]) h+='<input class="gap-in" data-i="'+gi+'" maxlength="1" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="字母">';
+      else if(ch===' ') h+='<span class="gap-space"> </span>';
+      else h+='<span class="gap-ch">'+esc(ch)+'</span>';
+    }
+    h+='</div>'+
+       '<div class="spell gaps-full"><input type="text" id="gapsFull" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="或整词输入"><button class="primary" id="btnCheck">确认</button></div>';
   } else if(type==='en2zh'){
     var opts=shuffle([shortZh(zh)].concat(distractors(v,'zh',3)));
     h+='<div class="qword'+(ph?' qphrase':'')+'" id="qPrompt">'+esc(v.word)+'</div><div class="ipa">'+esc(ER.fmtIpa(v.phonetic))+' <button id="btnSay">🔊</button></div>'+
@@ -281,6 +452,61 @@ function renderTest(it){
       if(!ok) it.diff=diffHtml(said, v.word);
       grade(it, v, ok);
     };
+  } else if(type==='cloze'){
+    var cin=$('clozeInput'); setTimeout(function(){ try{cin.focus();}catch(e){} },50);
+    var checkC=function(){
+      if(cin.readOnly) return;
+      if(!cin.value.trim()){ cin.focus(); return; }
+      var ok= ph? normPhrase(cin.value)===normPhrase(it.answer) : norm(cin.value)===norm(it.answer);
+      cin.readOnly=true; cin.classList.add(ok?'right':'wrong'); $('btnCheck').disabled=true;
+      if(!ok){
+        it.diff='<div class="hint">句子中的形式：<b>'+esc(it.answer)+'</b>'+(it.baseWord && norm(it.baseWord)!==norm(it.answer)?'（原词 '+esc(it.baseWord)+'）':'')+'</div>';
+      }
+      grade(it, v, ok);
+    };
+    $('btnCheck').onclick=checkC;
+    cin.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); if(cin.readOnly){ var n=$('btnNext'); if(n&&!n.hidden) n.click(); } else checkC(); } });
+  } else if(type==='gaps'){
+    ER.speak(v.word, v.audio);
+    var inputs=Array.prototype.slice.call(box.querySelectorAll('.gap-in'));
+    var full=$('gapsFull');
+    var locked=false;
+    var readGaps=function(){
+      var chars=v.word.split('');
+      inputs.forEach(function(inp){ var i=+inp.dataset.i; chars[i]=inp.value?inp.value.charAt(0):'_'; });
+      return chars.join('');
+    };
+    var checkG=function(){
+      if(locked) return;
+      var typed=full.value.trim();
+      var got= typed? typed : readGaps();
+      if(!typed && inputs.some(function(inp){return !inp.value;})){ (inputs.find(function(inp){return !inp.value;})||inputs[0]).focus(); return; }
+      var ok= ph? normPhrase(got)===normPhrase(v.word) : norm(got)===norm(v.word);
+      locked=true; $('btnCheck').disabled=true; full.readOnly=true;
+      inputs.forEach(function(inp){ inp.readOnly=true; var want=v.word.charAt(+inp.dataset.i); var good=norm(inp.value)===norm(want); inp.classList.add(good?'right':'wrong'); if(!inp.value) inp.value=want; });
+      full.classList.add(ok?'right':'wrong');
+      if(typed) full.value=typed;
+      grade(it, v, ok);
+    };
+    inputs.forEach(function(inp, idx){
+      inp.addEventListener('input',function(){
+        if(locked) return;
+        var val=inp.value.replace(/[^A-Za-z'-]/g,'');
+        inp.value=val?val.charAt(val.length-1):'';
+        if(inp.value && idx+1<inputs.length) inputs[idx+1].focus();
+        else if(inp.value) full.focus();
+      });
+      inp.addEventListener('keydown',function(e){
+        if(locked) return;
+        if(e.key==='Backspace' && !inp.value && idx>0){ e.preventDefault(); inputs[idx-1].focus(); inputs[idx-1].value=''; }
+        else if(e.key==='Enter'){ e.preventDefault(); checkG(); }
+        else if(e.key==='ArrowLeft' && idx>0){ inputs[idx-1].focus(); }
+        else if(e.key==='ArrowRight' && idx+1<inputs.length){ inputs[idx+1].focus(); }
+      });
+    });
+    full.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); checkG(); } });
+    $('btnCheck').onclick=checkG;
+    setTimeout(function(){ try{ (inputs[0]||full).focus(); }catch(e){} },50);
   } else {
     Array.prototype.forEach.call(box.querySelectorAll('.opts button'),function(b){
       b.onclick=function(){
@@ -295,6 +521,7 @@ function renderTest(it){
     if(type==='en2zh') ER.speak(v.word, v.audio);
   }
 }
+
 function grade(it, v, ok){
   if(it.done) return;
   it.done=true;
@@ -326,7 +553,7 @@ function grade(it, v, ok){
     }
   }
   var nb=$('btnNext'); nb.hidden=false; nb.onclick=advance;
-  if(ok && it.type!=='spell' && it.type!=='order'){ /* 选择题答对：稍后自动进入下一题 */ setTimeout(function(){ if(S && S.queue[S.idx]===it && !nb.dataset.clicked){ nb.dataset.clicked='1'; advance(); } },900); nb.onclick=function(){ nb.dataset.clicked='1'; advance(); }; }
+  if(ok && it.type!=='spell' && it.type!=='order' && it.type!=='cloze' && it.type!=='gaps'){ /* 选择题答对：稍后自动进入下一题 */ setTimeout(function(){ if(S && S.queue[S.idx]===it && !nb.dataset.clicked){ nb.dataset.clicked='1'; advance(); } },900); nb.onclick=function(){ nb.dataset.clicked='1'; advance(); }; }
   else setTimeout(function(){ try{nb.focus();}catch(e){} },30);
 }
 

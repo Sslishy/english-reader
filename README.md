@@ -34,7 +34,7 @@ js/app.js                工具、设置、查词、阅读、生词本、备份�
 js/review.js             每日复习会话
 articles/index.json      文章索引（新 → 旧）
 articles/YYYY-MM-DD.json 每日文章
-data/cet4.json           四级词表（4544 词）
+data/cet4.json、`data/examples-cet4.json`（补充例句，按需懒加载）           四级词表（4544 词）
 data/cet6.json           六级词表（2118 词，不含四级已有词）
 data/LICENSE-english-vocabulary.txt  词表来源许可证
 scripts/add_article.py   校验并添加文章、更新索引
@@ -101,7 +101,7 @@ localStorage 键：`er_vocab`（生词 / 短语，每条有 `word`、`type`（`"
 
 ## 四六级词表来源与许可
 
-`data/cet4.json`、`data/cet6.json` 由 `scripts/build_wordlists.py` 从
+`data/cet4.json、`data/examples-cet4.json`（补充例句，按需懒加载）`、`data/cet6.json` 由 `scripts/build_wordlists.py` 从
 [KyleBing/english-vocabulary](https://github.com/KyleBing/english-vocabulary)（`full_line_jsonl/sentence/正序/四级.jsonl`、`六级.jsonl`）生成，
 该数据集采用 **BSD 3-Clause License**（Copyright (c) 2022-2026, KyleBing），允许在保留版权声明和许可条款的前提下再分发，
 许可证全文见 `data/LICENSE-english-vocabulary.txt`。
@@ -118,7 +118,7 @@ python3 tests/test_site.py --live   # 额外做一次真实联网查词
 ```
 
 测试通过 `?today=YYYY-MM-DD` 参数模拟日期（这个参数在正式使用中也可用来“穿越”调试，不影响数据格式），覆盖：文章载入、查词弹窗、加入生词本 → 进入复习、三种题型、答对晋级、答错重置并在本轮重现、四/六级新词、多日间隔 1/2/4/7/15/30 天 → 已掌握、导出/导入往返、粘贴模式、手机触屏、无 JS 错误；
-短语：鼠标拖选弹出短语窗口（mock 翻译）、翻译失败时手动填写、超长提示、单词双击不受影响、文中高亮、手动添加 / 修改中文 / 筛选 / CSV、短语的英译汉 / 汉译英（干扰项为短语）/ 听写（忽略大小写标点空格）/ 连词成句、答对答错的排期、备份往返与旧数据兼容，以及手机视口下的长按选区 → 底部面板 → 加入 → 点按连词成句。截图保存在 `/tmp/er_*.png`。
+短语：鼠标拖选弹出短语窗口（mock 翻译）、翻译失败时手动填写、超长提示、单词双击不受影响、文中高亮、手动添加 / 修改中文 / 筛选 / CSV、短语的英译汉 / 汉译英（干扰项为短语）/ 听写（忽略大小写标点空格）/ 连词成句 / 句子填空 / 补全字母、答对答错的排期、备份往返与旧数据兼容，以及手机视口下的长按选区 → 底部面板 → 加入 → 点按连词成句。截图保存在 `/tmp/er_*.png`。
 
 ## 已知限制
 

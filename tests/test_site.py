@@ -129,7 +129,7 @@ def wait_phrase_pop(page):
 
 def force_type(page, w, t):
     """Set srs.qn so that SRS.qtype() gives question type t for entry w."""
-    page.evaluate("""([w,t])=>{var v=ER.findWord(w);for(var q=0;q<3;q++){if(SRS.qtype(v.word,{qn:q})===t){v.srs.qn=q;break;}}ER.saveVocab();}""", [w, t])
+    page.evaluate("""([w,t])=>{var v=ER.findWord(w);var n=(SRS.TYPES||[]).length||5;for(var q=0;q<n*2;q++){if(SRS.qtype(v.word,{qn:q})===t){v.srs.qn=q;ER.saveVocab();return;} } throw new Error('cannot force type '+t+' for '+w);}""", [w, t])
 
 
 def run_session(page, wrong=(), allow_retry_wrong=False, max_steps=200, log=None, tap=False, shots=None):
@@ -158,6 +158,23 @@ def run_session(page, wrong=(), allow_retry_wrong=False, max_steps=200, log=None
             else:
                 ans = ("zz" + st["word"]) if bad else st["word"].upper()  # upper: case-insensitive check
             page.fill("#spellInput", ans)
+            act(page.locator("#btnCheck"))
+        elif st["type"] == "cloze":
+            ans = st.get("answer") or st["word"]
+            page.fill("#clozeInput", ("zz" + ans) if bad else ans)
+            act(page.locator("#btnCheck"))
+        elif st["type"] == "gaps":
+            if bad:
+                page.fill("#gapsFull", "zzzz")
+            else:
+                if page.locator(".gap-in").count():
+                    page.evaluate("""(w)=>{
+                      document.querySelectorAll('.gap-in').forEach(inp=>{
+                        inp.value = w.charAt(+inp.dataset.i);
+                      });
+                    }""", st["word"])
+                else:
+                    page.fill("#gapsFull", st["word"])
             act(page.locator("#btnCheck"))
         elif st["type"] == "order":
             n = page.locator("#orderPool .tile").count()
@@ -236,7 +253,7 @@ with sync_playwright() as p:
     page.wait_for_selector("#statDue")
     check("review home shows 2 due / 10 new", page.inner_text("#statDue") == "2" and page.inner_text("#statNew") == "10")
     types, retries = run_session(page, wrong={"emission"})
-    check("all three question types used in session", types == {"spell", "en2zh", "zh2en"}, str(types))
+    check("mixed question types used in session", len(types) >= 3 and bool(types & {"spell", "en2zh", "zh2en"}), str(types))
     vs = vocab(page)
     cet_new = [x for x in vs if x["source"] == "cet4"]
     check("10 new CET-4 words added", len(cet_new) == 10, ", ".join(x["word"] for x in cet_new))
@@ -734,6 +751,75 @@ with sync_playwright() as p:
     A.click("#btnSyncOff")
     check("disconnect removes token, keeps data", A.evaluate("localStorage.getItem('er_sync_token')") is None and "offline word" in words(A) and A.locator("#syncSetup").is_visible())
     ca.close(); cb.close()
+
+    # ---------- 18. cloze + letter-gaps review types ----------
+    qc = browser.new_context(accept_downloads=True, viewport={"width": 1100, "height": 900})
+    mock_routes(qc)
+    qp = qc.new_page(); attach(qp, "cloze-gaps")
+    goto(qp, "2026-10-23", "#/review"); qp.wait_for_selector("#statNew")
+    # seed vocab with known sentences
+    qp.evaluate("""()=>{
+      ER.addWord({word:'contribute',zh:'v. 贡献',sentence:'She contributed a lot to the project.',sentence_zh:'她为这个项目贡献了很多。',source:'manual'});
+      ER.addWord({word:'acutely',zh:'adv. 敏锐地',sentence:'He felt the loss acutely.',sentence_zh:'他敏锐地感到了损失。',source:'manual'});
+      ER.addWord({word:'make ends meet',type:'phrase',zh:'勉强维持生计',sentence:'Many families struggle to make ends meet.',sentence_zh:'许多家庭艰难维持生计。',source:'manual'});
+      // due today
+      ['contribute','acutely','make ends meet'].forEach(w=>{var v=ER.findWord(w);v.srs.due='2026-10-23';v.srs.stage=2;});
+      ER.saveVocab();
+      ER.settings.newPerDay=0; ER.saveSettings();
+    }""")
+    qp.reload(); qp.wait_for_function("window.ER && ER.today")
+    goto(qp, "2026-10-23", "#/review"); qp.wait_for_selector("#statDue")
+    # unit helpers
+    mask = qp.evaluate("()=>ER.gapMask('acutely', 2, '2026-10-23')")
+    check("gapMask keeps first letter and hides some",
+          mask["text"] == "acutely" and mask["display"][0] == "a" and "_" in mask["display"]
+          and 1 <= len(mask["gaps"]) <= 5, str(mask))
+    mask2 = qp.evaluate("()=>ER.gapMask('acutely', 2, '2026-10-23')")
+    check("gapMask deterministic for word+day", mask == mask2)
+    blank = qp.evaluate("()=>{var v=ER.findWord('contribute');var s=ER.resolveSentence(v);return {sent:s, blank:ER.clozeBlank(v,s.en)};}")
+    check("cloze blanks inflected form in sentence",
+          blank["blank"] and blank["blank"]["form"].lower() == "contributed"
+          and blank["sent"]["en"].lower().find("contributed") >= 0, str(blank)[:240])
+    force_type(qp, "contribute", "cloze")
+    force_type(qp, "acutely", "gaps")
+    force_type(qp, "make ends meet", "cloze")
+    qlog = []
+    run_session(qp, wrong={"acutely"}, log=qlog)
+    by = {e["word"]: e for e in qlog if e["first"]}
+    check("cloze question for contribute", by.get("contribute", {}).get("type") == "cloze" and by["contribute"]["ok"], str(by.get("contribute")))
+    check("gaps question for acutely (wrong resets)", by.get("acutely", {}).get("type") == "gaps" and not by["acutely"]["ok"], str(by.get("acutely")))
+    check("wrong gaps -> stage 0", (word(qp, "acutely") or {}).get("srs", {}).get("stage") == 0)
+    check("cloze phrase blanks whole phrase", by.get("make ends meet", {}).get("type") == "cloze" and by["make ends meet"]["ok"], str(by.get("make ends meet")))
+    # CET examples file available for words without source ex
+    ex = qp.evaluate("""async()=>{
+      await ER.pickNewCet(0);
+      // load examples via a dummy session prep: call resolve after ensuring lists
+      return await fetch('data/examples-cet6.json').then(r=>r.json()).then(d=>({n:Object.keys(d.examples||{}).length, acutely:d.examples.acutely}));
+    }""")
+    check("examples-cet6.json has fill-ins", ex["n"] >= 100 and ex["acutely"] and "acutely" in ex["acutely"]["en"].lower(), str(ex)[:200])
+    qc.close()
+
+    # mobile letter-gap inputs
+    qm = browser.new_context(viewport={"width": 390, "height": 760}, has_touch=True, is_mobile=True, device_scale_factor=2)
+    mock_routes(qm)
+    qmp = qm.new_page(); attach(qmp, "gaps-mobile")
+    goto(qmp, "2026-10-23", "#/review")
+    qmp.evaluate("""()=>{
+      ER.addWord({word:'statue',zh:'n. 雕像',source:'manual'});
+      var v=ER.findWord('statue'); v.srs.due='2026-10-23'; v.srs.stage=3; ER.saveVocab();
+      ER.settings.newPerDay=0; ER.saveSettings();
+    }""")
+    qmp.reload(); goto(qmp, "2026-10-23", "#/review"); qmp.wait_for_selector("#statDue")
+    force_type(qmp, "statue", "gaps")
+    qmp.click("#btnStart")
+    qmp.wait_for_selector("#qCard[data-type=gaps]")
+    check("mobile gaps: letter inputs present", qmp.locator(".gap-in").count() >= 1)
+    qmp.evaluate("""(w)=>{document.querySelectorAll('.gap-in').forEach(inp=>{inp.value=w.charAt(+inp.dataset.i);});}""", "statue")
+    qmp.locator("#btnCheck").tap()
+    qmp.wait_for_selector("#btnNext:not([hidden])")
+    check("mobile gaps: correct via letter inputs", "正确" in qmp.inner_text("#feedback"))
+    qmp.screenshot(path="/tmp/er_gaps_mobile.png")
+    qm.close()
 
     # ---------- 17. CET new-word order (hash-mixed, deterministic) ----------
     oc = browser.new_context(); mock_routes(oc)

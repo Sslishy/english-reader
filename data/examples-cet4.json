@@ -1,0 +1,801 @@
+{
+  "meta": {
+    "level": "cet4",
+    "count": 198,
+    "note": "Fill-in examples for CET entries that lack source sentences. Lazy-loaded by review cloze."
+  },
+  "examples": {
+    "address": {
+      "en": "We need to address before we make a final decision.",
+      "zh": "我们在做最终决定前需要解决。"
+    },
+    "advocator": {
+      "en": "They talked about the advocator for a long time.",
+      "zh": "他们就这个主张者讨论了很久。"
+    },
+    "approximately": {
+      "en": "She explained the main idea approximately again.",
+      "zh": "她再次大约解释了主要意思。"
+    },
+    "arrange": {
+      "en": "We need to arrange before we make a final decision.",
+      "zh": "我们在做最终决定前需要把…（系统地）分类。"
+    },
+    "avail": {
+      "en": "People often avail when they face a hard problem.",
+      "zh": "人们面对难题时常常会有益。"
+    },
+    "aviate": {
+      "en": "People often aviate when they face a hard problem.",
+      "zh": "人们面对难题时常常会驾驶飞机。"
+    },
+    "caregiver": {
+      "en": "This caregiver is important for everyday life.",
+      "zh": "这个照料者对日常生活很重要。"
+    },
+    "conform": {
+      "en": "She tried to conform in a calm and careful way.",
+      "zh": "她试着冷静而仔细地相一致。"
+    },
+    "conscience": {
+      "en": "They talked about the conscience for a long time.",
+      "zh": "他们就这个良心讨论了很久。"
+    },
+    "contract": {
+      "en": "A clear contract can help students learn faster.",
+      "zh": "清楚的合同能帮助学生学得更快。"
+    },
+    "delightful": {
+      "en": "Her answer sounded delightful but still useful.",
+      "zh": "她的回答听起来高兴的，但仍然有用。"
+    },
+    "determination": {
+      "en": "A clear determination can help students learn faster.",
+      "zh": "清楚的意志能帮助学生学得更快。"
+    },
+    "domination": {
+      "en": "A clear domination can help students learn faster.",
+      "zh": "清楚的主导能帮助学生学得更快。"
+    },
+    "downfall": {
+      "en": "This downfall is important for everyday life.",
+      "zh": "这个（雨等的）大下特下对日常生活很重要。"
+    },
+    "dramatically": {
+      "en": "She explained the main idea dramatically again.",
+      "zh": "她再次戏剧性地解释了主要意思。"
+    },
+    "enroll": {
+      "en": "We need to enroll before we make a final decision.",
+      "zh": "我们在做最终决定前需要注册。"
+    },
+    "enrollment": {
+      "en": "This enrollment is important for everyday life.",
+      "zh": "这个入学人数对日常生活很重要。"
+    },
+    "establishment": {
+      "en": "A clear establishment can help students learn faster.",
+      "zh": "清楚的确立能帮助学生学得更快。"
+    },
+    "favorable": {
+      "en": "The situation looks favorable to many young people.",
+      "zh": "对很多年轻人来说，这种情况看起来很赞同的。"
+    },
+    "fine": {
+      "en": "We need to fine before we make a final decision.",
+      "zh": "我们在做最终决定前需要罚款。"
+    },
+    "formulate": {
+      "en": "People often formulate when they face a hard problem.",
+      "zh": "人们面对难题时常常会规定。"
+    },
+    "generalization": {
+      "en": "They talked about the generalization for a long time.",
+      "zh": "他们就这个一般化讨论了很久。"
+    },
+    "groundlessly": {
+      "en": "She explained the main idea groundlessly again.",
+      "zh": "她再次无缘无故地解释了主要意思。"
+    },
+    "hardworking": {
+      "en": "Her answer sounded hardworking but still useful.",
+      "zh": "她的回答听起来苦干的，但仍然有用。"
+    },
+    "honor": {
+      "en": "People often honor when they face a hard problem.",
+      "zh": "人们面对难题时常常会纪念。"
+    },
+    "hospitalize": {
+      "en": "She tried to hospitalize in a calm and careful way.",
+      "zh": "她试着冷静而仔细地就医。"
+    },
+    "impermanency": {
+      "en": "A clear impermanency can help students learn faster.",
+      "zh": "清楚的非永久性能帮助学生学得更快。"
+    },
+    "import": {
+      "en": "A clear import can help students learn faster.",
+      "zh": "清楚的进口能帮助学生学得更快。"
+    },
+    "installment": {
+      "en": "A clear installment can help students learn faster.",
+      "zh": "清楚的安装能帮助学生学得更快。"
+    },
+    "irrationally": {
+      "en": "He spoke irrationally during the short meeting.",
+      "zh": "他在短会上不合理地发言。"
+    },
+    "marvelous": {
+      "en": "Her answer sounded marvelous but still useful.",
+      "zh": "她的回答听起来引起惊异的，但仍然有用。"
+    },
+    "mineral": {
+      "en": "Her answer sounded mineral but still useful.",
+      "zh": "她的回答听起来矿物的，但仍然有用。"
+    },
+    "motivation": {
+      "en": "A clear motivation can help students learn faster.",
+      "zh": "清楚的激励能帮助学生学得更快。"
+    },
+    "narrow": {
+      "en": "She tried to narrow in a calm and careful way.",
+      "zh": "她试着冷静而仔细地限制。"
+    },
+    "neighborhood": {
+      "en": "A clear neighborhood can help students learn faster.",
+      "zh": "清楚的地区能帮助学生学得更快。"
+    },
+    "postgraduate": {
+      "en": "They talked about the postgraduate for a long time.",
+      "zh": "他们就这个研究生讨论了很久。"
+    },
+    "repave": {
+      "en": "She tried to repave in a calm and careful way.",
+      "zh": "她试着冷静而仔细地再铺。"
+    },
+    "showmanship": {
+      "en": "A clear showmanship can help students learn faster.",
+      "zh": "清楚的主技演出的技巧能帮助学生学得更快。"
+    },
+    "specialize": {
+      "en": "People often specialize when they face a hard problem.",
+      "zh": "人们面对难题时常常会专业从事。"
+    },
+    "spread": {
+      "en": "We need to spread before we make a final decision.",
+      "zh": "我们在做最终决定前需要传播。"
+    },
+    "tighten": {
+      "en": "It was a tighten day for the whole family.",
+      "zh": "对全家来说，那是紧的的一天。"
+    },
+    "trait": {
+      "en": "This trait is important for everyday life.",
+      "zh": "这个性格对日常生活很重要。"
+    },
+    "treatment": {
+      "en": "They talked about the treatment for a long time.",
+      "zh": "他们就这个治疗讨论了很久。"
+    },
+    "unaffordable": {
+      "en": "It was a unaffordable day for the whole family.",
+      "zh": "对全家来说，那是买不起的的一天。"
+    },
+    "lap": {
+      "en": "This lap is important for everyday life.",
+      "zh": "这个膝盖对日常生活很重要。"
+    },
+    "prohibitively": {
+      "en": "He spoke prohibitively during the short meeting.",
+      "zh": "他在短会上过分地发言。"
+    },
+    "implication": {
+      "en": "They talked about the implication for a long time.",
+      "zh": "他们就这个含义讨论了很久。"
+    },
+    "radically": {
+      "en": "The numbers changed radically last year.",
+      "zh": "去年这些数字完全地变化了。"
+    },
+    "favor": {
+      "en": "She tried to favor in a calm and careful way.",
+      "zh": "她试着冷静而仔细地偏好。"
+    },
+    "counseling": {
+      "en": "They talked about the counseling for a long time.",
+      "zh": "他们就这个咨询服务讨论了很久。"
+    },
+    "procedure": {
+      "en": "A clear procedure can help students learn faster.",
+      "zh": "清楚的程序能帮助学生学得更快。"
+    },
+    "racially": {
+      "en": "The numbers changed racially last year.",
+      "zh": "去年这些数字种族上地变化了。"
+    },
+    "headquarter": {
+      "en": "We need to headquarter before we make a final decision.",
+      "zh": "我们在做最终决定前需要设立总部。"
+    },
+    "prosper": {
+      "en": "She tried to prosper in a calm and careful way.",
+      "zh": "她试着冷静而仔细地繁荣。"
+    },
+    "passively": {
+      "en": "She explained the main idea passively again.",
+      "zh": "她再次消极地解释了主要意思。"
+    },
+    "offense": {
+      "en": "This offense is important for everyday life.",
+      "zh": "这个过错对日常生活很重要。"
+    },
+    "logically": {
+      "en": "The numbers changed logically last year.",
+      "zh": "去年这些数字合乎情理地变化了。"
+    },
+    "ring": {
+      "en": "A clear ring can help students learn faster.",
+      "zh": "清楚的拳击台能帮助学生学得更快。"
+    },
+    "mutually": {
+      "en": "He spoke mutually during the short meeting.",
+      "zh": "他在短会上互相地发言。"
+    },
+    "acceptance": {
+      "en": "This acceptance is important for everyday life.",
+      "zh": "这个接受对日常生活很重要。"
+    },
+    "accessary": {
+      "en": "They talked about the accessary for a long time.",
+      "zh": "他们就这个同谋讨论了很久。"
+    },
+    "accommodation": {
+      "en": "They talked about the accommodation for a long time.",
+      "zh": "他们就这个招待设备讨论了很久。"
+    },
+    "accordance": {
+      "en": "This accordance is important for everyday life.",
+      "zh": "这个一致对日常生活很重要。"
+    },
+    "across": {
+      "en": "Students should remember the word \"across\" in this lesson.",
+      "zh": "学生应记住本课中的单词“across”。"
+    },
+    "all": {
+      "en": "Her answer sounded all but still useful.",
+      "zh": "她的回答听起来全部的，但仍然有用。"
+    },
+    "amongst": {
+      "en": "Students should remember the word \"amongst\" in this lesson.",
+      "zh": "学生应记住本课中的单词“amongst”。"
+    },
+    "anyhow": {
+      "en": "He spoke anyhow during the short meeting.",
+      "zh": "他在短会上无论如何发言。"
+    },
+    "anyway": {
+      "en": "He spoke anyway during the short meeting.",
+      "zh": "他在短会上无论如何发言。"
+    },
+    "appliance": {
+      "en": "This appliance is important for everyday life.",
+      "zh": "这个用具对日常生活很重要。"
+    },
+    "astronaut": {
+      "en": "A clear astronaut can help students learn faster.",
+      "zh": "清楚的宇宙航行员能帮助学生学得更快。"
+    },
+    "aunt": {
+      "en": "This aunt is important for everyday life.",
+      "zh": "这个伯母对日常生活很重要。"
+    },
+    "awfully": {
+      "en": "The numbers changed awfully last year.",
+      "zh": "去年这些数字令人畏惧的变化了。"
+    },
+    "barn": {
+      "en": "They talked about the barn for a long time.",
+      "zh": "他们就这个谷仓讨论了很久。"
+    },
+    "basketball": {
+      "en": "They talked about the basketball for a long time.",
+      "zh": "他们就这个篮球讨论了很久。"
+    },
+    "bathroom": {
+      "en": "A clear bathroom can help students learn faster.",
+      "zh": "清楚的浴室能帮助学生学得更快。"
+    },
+    "behalf": {
+      "en": "This behalf is important for everyday life.",
+      "zh": "这个利益对日常生活很重要。"
+    },
+    "behavior": {
+      "en": "They talked about the behavior for a long time.",
+      "zh": "他们就这个行为讨论了很久。"
+    },
+    "berry": {
+      "en": "A clear berry can help students learn faster.",
+      "zh": "清楚的浆果(如草莓等)能帮助学生学得更快。"
+    },
+    "blanket": {
+      "en": "They talked about the blanket for a long time.",
+      "zh": "他们就这个毛毯讨论了很久。"
+    },
+    "both": {
+      "en": "Students should remember the word \"both\" in this lesson.",
+      "zh": "学生应记住本课中的单词“both”。"
+    },
+    "bound": {
+      "en": "The situation looks bound to many young people.",
+      "zh": "对很多年轻人来说，这种情况看起来很一定的。"
+    },
+    "brute": {
+      "en": "This brute is important for everyday life.",
+      "zh": "这个禽兽对日常生活很重要。"
+    },
+    "bucket": {
+      "en": "A clear bucket can help students learn faster.",
+      "zh": "清楚的水桶能帮助学生学得更快。"
+    },
+    "bud": {
+      "en": "This bud is important for everyday life.",
+      "zh": "这个芽对日常生活很重要。"
+    },
+    "bulk": {
+      "en": "They talked about the bulk for a long time.",
+      "zh": "他们就这个物体讨论了很久。"
+    },
+    "butcher": {
+      "en": "A clear butcher can help students learn faster.",
+      "zh": "清楚的屠夫能帮助学生学得更快。"
+    },
+    "cabin": {
+      "en": "This cabin is important for everyday life.",
+      "zh": "这个小屋对日常生活很重要。"
+    },
+    "can": {
+      "en": "They talked about the can for a long time.",
+      "zh": "他们就这个罐头讨论了很久。"
+    },
+    "canoe": {
+      "en": "This canoe is important for everyday life.",
+      "zh": "这个独木舟对日常生活很重要。"
+    },
+    "cart": {
+      "en": "A clear cart can help students learn faster.",
+      "zh": "清楚的二轮运货马车能帮助学生学得更快。"
+    },
+    "catalog": {
+      "en": "They talked about the catalog for a long time.",
+      "zh": "他们就这个目录讨论了很久。"
+    },
+    "china": {
+      "en": "This China is important for everyday life.",
+      "zh": "这个中国对日常生活很重要。"
+    },
+    "cigaret": {
+      "en": "This cigaret is important for everyday life.",
+      "zh": "这个香烟对日常生活很重要。"
+    },
+    "clay": {
+      "en": "They talked about the clay for a long time.",
+      "zh": "他们就这个粘土讨论了很久。"
+    },
+    "colonel": {
+      "en": "This colonel is important for everyday life.",
+      "zh": "这个陆军上校对日常生活很重要。"
+    },
+    "color": {
+      "en": "A clear color can help students learn faster.",
+      "zh": "清楚的颜色能帮助学生学得更快。"
+    },
+    "comprehension": {
+      "en": "They talked about the comprehension for a long time.",
+      "zh": "他们就这个理解讨论了很久。"
+    },
+    "could": {
+      "en": "Students should remember the word \"could\" in this lesson.",
+      "zh": "学生应记住本课中的单词“could”。"
+    },
+    "course": {
+      "en": "A clear course can help students learn faster.",
+      "zh": "清楚的课程能帮助学生学得更快。"
+    },
+    "desk": {
+      "en": "They talked about the desk for a long time.",
+      "zh": "他们就这个书桌讨论了很久。"
+    },
+    "diagram": {
+      "en": "This diagram is important for everyday life.",
+      "zh": "这个图解对日常生活很重要。"
+    },
+    "difficulty": {
+      "en": "Her answer sounded difficulty but still useful.",
+      "zh": "她的回答听起来困难，但仍然有用。"
+    },
+    "direction": {
+      "en": "A clear direction can help students learn faster.",
+      "zh": "清楚的方向能帮助学生学得更快。"
+    },
+    "dishonour": {
+      "en": "This dishonour is important for everyday life.",
+      "zh": "这个不光彩对日常生活很重要。"
+    },
+    "displease": {
+      "en": "We need to displease before we make a final decision.",
+      "zh": "我们在做最终决定前需要使不愉快。"
+    },
+    "dispose": {
+      "en": "She tried to dispose in a calm and careful way.",
+      "zh": "她试着冷静而仔细地去掉。"
+    },
+    "donkey": {
+      "en": "A clear donkey can help students learn faster.",
+      "zh": "清楚的驴能帮助学生学得更快。"
+    },
+    "dragon": {
+      "en": "A clear dragon can help students learn faster.",
+      "zh": "清楚的龙能帮助学生学得更快。"
+    },
+    "drill": {
+      "en": "They talked about the drill for a long time.",
+      "zh": "他们就这个钻头讨论了很久。"
+    },
+    "either": {
+      "en": "You will see \"either\" in many news articles.",
+      "zh": "你会在很多新闻文章里看到“either”。"
+    },
+    "england": {
+      "en": "This England is important for everyday life.",
+      "zh": "这个英格兰对日常生活很重要。"
+    },
+    "everybody": {
+      "en": "Students should remember the word \"everybody\" in this lesson.",
+      "zh": "学生应记住本课中的单词“everybody”。"
+    },
+    "exclusively": {
+      "en": "She explained the main idea exclusively again.",
+      "zh": "她再次专门地解释了主要意思。"
+    },
+    "experiment": {
+      "en": "This experiment is important for everyday life.",
+      "zh": "这个实验对日常生活很重要。"
+    },
+    "expression": {
+      "en": "A clear expression can help students learn faster.",
+      "zh": "清楚的词句能帮助学生学得更快。"
+    },
+    "extent": {
+      "en": "A clear extent can help students learn faster.",
+      "zh": "清楚的广度能帮助学生学得更快。"
+    },
+    "fact": {
+      "en": "They talked about the fact for a long time.",
+      "zh": "他们就这个事实讨论了很久。"
+    },
+    "farmer": {
+      "en": "They talked about the farmer for a long time.",
+      "zh": "他们就这个农民讨论了很久。"
+    },
+    "flour": {
+      "en": "This flour is important for everyday life.",
+      "zh": "这个面粉对日常生活很重要。"
+    },
+    "fraction": {
+      "en": "This fraction is important for everyday life.",
+      "zh": "这个小部分对日常生活很重要。"
+    },
+    "france": {
+      "en": "This France is important for everyday life.",
+      "zh": "这个法国对日常生活很重要。"
+    },
+    "from": {
+      "en": "Students should remember the word \"from\" in this lesson.",
+      "zh": "学生应记住本课中的单词“from”。"
+    },
+    "fruitful": {
+      "en": "Her answer sounded fruitful but still useful.",
+      "zh": "她的回答听起来多产的，但仍然有用。"
+    },
+    "fur": {
+      "en": "A clear fur can help students learn faster.",
+      "zh": "清楚的软毛能帮助学生学得更快。"
+    },
+    "furnace": {
+      "en": "They talked about the furnace for a long time.",
+      "zh": "他们就这个炉子讨论了很久。"
+    },
+    "gay": {
+      "en": "The situation looks gay to many young people.",
+      "zh": "对很多年轻人来说，这种情况看起来很快乐的。"
+    },
+    "germany": {
+      "en": "They talked about the Germany for a long time.",
+      "zh": "他们就这个德意志讨论了很久。"
+    },
+    "golden": {
+      "en": "The situation looks golden to many young people.",
+      "zh": "对很多年轻人来说，这种情况看起来很金色的。"
+    },
+    "governor": {
+      "en": "They talked about the governor for a long time.",
+      "zh": "他们就这个州长讨论了很久。"
+    },
+    "gown": {
+      "en": "A clear gown can help students learn faster.",
+      "zh": "清楚的长袍能帮助学生学得更快。"
+    },
+    "gramme": {
+      "en": "This gramme is important for everyday life.",
+      "zh": "这个克(重量单位)对日常生活很重要。"
+    },
+    "gratitude": {
+      "en": "Her answer sounded gratitude but still useful.",
+      "zh": "她的回答听起来感激，但仍然有用。"
+    },
+    "greenhouse": {
+      "en": "They talked about the greenhouse for a long time.",
+      "zh": "他们就这个温室讨论了很久。"
+    },
+    "gunpowder": {
+      "en": "A clear gunpowder can help students learn faster.",
+      "zh": "清楚的黑色火药能帮助学生学得更快。"
+    },
+    "hawk": {
+      "en": "They talked about the hawk for a long time.",
+      "zh": "他们就这个鹰讨论了很久。"
+    },
+    "hedge": {
+      "en": "This hedge is important for everyday life.",
+      "zh": "这个篱笆对日常生活很重要。"
+    },
+    "hence": {
+      "en": "He spoke hence during the short meeting.",
+      "zh": "他在短会上因此发言。"
+    },
+    "hesitate": {
+      "en": "People often hesitate when they face a hard problem.",
+      "zh": "人们面对难题时常常会犹豫。"
+    },
+    "honey": {
+      "en": "They talked about the honey for a long time.",
+      "zh": "他们就这个蜜讨论了很久。"
+    },
+    "hot": {
+      "en": "It was a hot day for the whole family.",
+      "zh": "对全家来说，那是热的的一天。"
+    },
+    "importance": {
+      "en": "They talked about the importance for a long time.",
+      "zh": "他们就这个重要讨论了很久。"
+    },
+    "interaction": {
+      "en": "This interaction is important for everyday life.",
+      "zh": "这个相互作用对日常生活很重要。"
+    },
+    "interpreter": {
+      "en": "This interpreter is important for everyday life.",
+      "zh": "这个译员对日常生活很重要。"
+    },
+    "italian": {
+      "en": "The situation looks Italian to many young people.",
+      "zh": "对很多年轻人来说，这种情况看起来很意大利的n意大利人。"
+    },
+    "japan": {
+      "en": "They talked about the Japan for a long time.",
+      "zh": "他们就这个日本讨论了很久。"
+    },
+    "jazz": {
+      "en": "A clear jazz can help students learn faster.",
+      "zh": "清楚的爵士音乐能帮助学生学得更快。"
+    },
+    "lamb": {
+      "en": "A clear lamb can help students learn faster.",
+      "zh": "清楚的羔羊能帮助学生学得更快。"
+    },
+    "lame": {
+      "en": "The situation looks lame to many young people.",
+      "zh": "对很多年轻人来说，这种情况看起来很跛的。"
+    },
+    "lead": {
+      "en": "They talked about the lead for a long time.",
+      "zh": "他们就这个铅讨论了很久。"
+    },
+    "liquor": {
+      "en": "They talked about the liquor for a long time.",
+      "zh": "他们就这个酒讨论了很久。"
+    },
+    "locomotive": {
+      "en": "A clear locomotive can help students learn faster.",
+      "zh": "清楚的火车头能帮助学生学得更快。"
+    },
+    "meadow": {
+      "en": "This meadow is important for everyday life.",
+      "zh": "这个草地对日常生活很重要。"
+    },
+    "microcomputer": {
+      "en": "They talked about the microcomputer for a long time.",
+      "zh": "他们就这个微型计算机讨论了很久。"
+    },
+    "ninth": {
+      "en": "Students should remember the word \"ninth\" in this lesson.",
+      "zh": "学生应记住本课中的单词“ninth”。"
+    },
+    "oak": {
+      "en": "This oak is important for everyday life.",
+      "zh": "这个栎属植物对日常生活很重要。"
+    },
+    "oar": {
+      "en": "They talked about the oar for a long time.",
+      "zh": "他们就这个浆讨论了很久。"
+    },
+    "occasionally": {
+      "en": "She explained the main idea occasionally again.",
+      "zh": "她再次偶然解释了主要意思。"
+    },
+    "oceania": {
+      "en": "They talked about the Oceania for a long time.",
+      "zh": "他们就这个大洋洲讨论了很久。"
+    },
+    "official": {
+      "en": "Her answer sounded official but still useful.",
+      "zh": "她的回答听起来官员的，但仍然有用。"
+    },
+    "okay": {
+      "en": "Students should remember the word \"okay\" in this lesson.",
+      "zh": "学生应记住本课中的单词“okay”。"
+    },
+    "ought": {
+      "en": "She tried to ought in a calm and careful way.",
+      "zh": "她试着冷静而仔细地应当。"
+    },
+    "outskirt": {
+      "en": "This outskirt is important for everyday life.",
+      "zh": "这个外边对日常生活很重要。"
+    },
+    "overlook": {
+      "en": "People often overlook when they face a hard problem.",
+      "zh": "人们面对难题时常常会眺望。"
+    },
+    "ox": {
+      "en": "This ox is important for everyday life.",
+      "zh": "这个牛对日常生活很重要。"
+    },
+    "paw": {
+      "en": "This paw is important for everyday life.",
+      "zh": "这个脚爪对日常生活很重要。"
+    },
+    "pick": {
+      "en": "A clear pick can help students learn faster.",
+      "zh": "清楚的镐能帮助学生学得更快。"
+    },
+    "pork": {
+      "en": "This pork is important for everyday life.",
+      "zh": "这个猪肉对日常生活很重要。"
+    },
+    "precision": {
+      "en": "A clear precision can help students learn faster.",
+      "zh": "清楚的精确能帮助学生学得更快。"
+    },
+    "prefer": {
+      "en": "She tried to prefer in a calm and careful way.",
+      "zh": "她试着冷静而仔细地宁可。"
+    },
+    "probably": {
+      "en": "She explained the main idea probably again.",
+      "zh": "她再次或许解释了主要意思。"
+    },
+    "provided": {
+      "en": "Students should remember the word \"provided\" in this lesson.",
+      "zh": "学生应记住本课中的单词“provided”。"
+    },
+    "ratio": {
+      "en": "A clear ratio can help students learn faster.",
+      "zh": "清楚的比能帮助学生学得更快。"
+    },
+    "really": {
+      "en": "She explained the main idea really again.",
+      "zh": "她再次真正地解释了主要意思。"
+    },
+    "reflexion": {
+      "en": "They talked about the reflexion for a long time.",
+      "zh": "他们就这个反射讨论了很久。"
+    },
+    "refrigerator": {
+      "en": "They talked about the refrigerator for a long time.",
+      "zh": "他们就这个冰箱讨论了很久。"
+    },
+    "relativity": {
+      "en": "This relativity is important for everyday life.",
+      "zh": "这个相关性对日常生活很重要。"
+    },
+    "reservior": {
+      "en": "This reservior is important for everyday life.",
+      "zh": "这个水库对日常生活很重要。"
+    },
+    "silver": {
+      "en": "They talked about the silver for a long time.",
+      "zh": "他们就这个银讨论了很久。"
+    },
+    "subtract": {
+      "en": "She tried to subtract in a calm and careful way.",
+      "zh": "她试着冷静而仔细地减。"
+    },
+    "sulfur": {
+      "en": "They talked about the sulfur for a long time.",
+      "zh": "他们就这个硫(磺)讨论了很久。"
+    },
+    "suspicion": {
+      "en": "This suspicion is important for everyday life.",
+      "zh": "这个怀疑对日常生活很重要。"
+    },
+    "sweater": {
+      "en": "This sweater is important for everyday life.",
+      "zh": "这个厚运动衫对日常生活很重要。"
+    },
+    "temple": {
+      "en": "A clear temple can help students learn faster.",
+      "zh": "清楚的圣堂能帮助学生学得更快。"
+    },
+    "vigorous": {
+      "en": "It was a vigorous day for the whole family.",
+      "zh": "对全家来说，那是朝气蓬勃的的一天。"
+    },
+    "waggon": {
+      "en": "They talked about the waggon for a long time.",
+      "zh": "他们就这个四轮运货马车讨论了很久。"
+    },
+    "wax": {
+      "en": "This wax is important for everyday life.",
+      "zh": "这个蜡对日常生活很重要。"
+    },
+    "whilst": {
+      "en": "You will see \"whilst\" in many news articles.",
+      "zh": "你会在很多新闻文章里看到“whilst”。"
+    },
+    "whichever": {
+      "en": "You will see \"whichever\" in many news articles.",
+      "zh": "你会在很多新闻文章里看到“whichever”。"
+    },
+    "guitar": {
+      "en": "This guitar is important for everyday life.",
+      "zh": "这个吉他对日常生活很重要。"
+    },
+    "fourfold": {
+      "en": "He spoke fourfold during the short meeting.",
+      "zh": "他在短会上四倍发言。"
+    },
+    "according": {
+      "en": "Her answer sounded according but still useful.",
+      "zh": "她的回答听起来相等的，但仍然有用。"
+    },
+    "providing": {
+      "en": "Students should remember the word \"providing\" in this lesson.",
+      "zh": "学生应记住本课中的单词“providing”。"
+    },
+    "reservoir": {
+      "en": "This reservoir is important for everyday life.",
+      "zh": "这个水库对日常生活很重要。"
+    },
+    "mold": {
+      "en": "A clear mold can help students learn faster.",
+      "zh": "清楚的霉能帮助学生学得更快。"
+    },
+    "connexion": {
+      "en": "This connexion is important for everyday life.",
+      "zh": "这个的英式拼法对日常生活很重要。"
+    },
+    "enquire": {
+      "en": "She tried to enquire in a calm and careful way.",
+      "zh": "她试着冷静而仔细地询问。"
+    },
+    "scary": {
+      "en": "The situation looks scary to many young people.",
+      "zh": "对很多年轻人来说，这种情况看起来很引起惊慌的。"
+    },
+    "fulfill": {
+      "en": "People often fulfill when they face a hard problem.",
+      "zh": "人们面对难题时常常会履行。"
+    }
+  }
+}
