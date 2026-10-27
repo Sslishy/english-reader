@@ -11,9 +11,9 @@ var cetLists = {};       // level -> list
 
 function today(){ return ER.today(); }
 function daily(){ var d=ER.lsGet('er_daily',{}); if(d.date!==today()) d={date:today(),newDone:0}; return d; }
-function saveDaily(d){ ER.lsSet('er_daily',d); }
+function saveDaily(d){ ER.lsSet('er_daily',d); if(ER.syncSoon) ER.syncSoon(); }
 function seen(){ return ER.lsGet('er_cet_seen',{}); }
-function markSeen(w,how){ var s=seen(); s[w.toLowerCase()]=how; ER.lsSet('er_cet_seen',s); }
+function markSeen(w,how){ var s=seen(); s[w.toLowerCase()]=how; ER.lsSet('er_cet_seen',s); if(ER.syncSoon) ER.syncSoon(); }
 function shuffle(a){ for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;} return a; }
 function norm(s){ return String(s||'').toLowerCase().replace(/[’‘`]/g,"'").replace(/\s+/g,' ').trim(); }
 function shortZh(z){ z=String(z||''); return z.length>34? z.slice(0,34)+'…' : z; }
@@ -271,6 +271,7 @@ function grade(it, v, ok){
     v.srs=SRS.practice(v.srs);
     if(ok) S.retryOk++;
   }
+  var live=ER.findWord(v.word); if(live&&live!==v) live.srs=v.srs;   // 生词本在复习途中被重新读取过（别的标签页改动）
   ER.saveVocab();
   var nextTxt = v.srs.stage>=SRS.MAX_STAGE? '已掌握，'+v.srs.due+' 抽查' : '下次复习：'+v.srs.due+'（阶段 '+v.srs.stage+'）';
   if(ok){

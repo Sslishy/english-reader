@@ -179,6 +179,8 @@ with sync_playwright() as p:
     check("key words rendered", page.locator(".kw").count() >= 8)
     check("source link points to real article", page.locator(f'a[href="{json.load(open(os.path.join(ROOT, "articles", idx[0]["file"]), encoding="utf-8"))["source_url"]}"]').count() == 1)
     check("nav badge hidden with empty vocab", page.locator("#dueBadge").is_hidden())
+    # the steps below use the words of the first article (2026-10-23); newer daily articles are added every day
+    goto(page, "2026-10-23", "#/read/2026-10-23"); page.wait_for_selector("#articleReader h2")
 
     # ---------- 2. lookup popup on article ----------
     page.locator('#articleReader .w[data-w="emissions"]').first.dblclick()
@@ -292,7 +294,8 @@ with sync_playwright() as p:
     fc.value.set_files(path)
     page.wait_for_function(f"ER.getVocab().length==={len(before)}")
     after = vocab(page)
-    norm = lambda L: sorted(json.dumps(x, sort_keys=True, ensure_ascii=False) for x in L)
+    # updatedAt is sync bookkeeping (a replace import re-stamps it on purpose), compare the learning data itself
+    norm = lambda L: sorted(json.dumps({k: v for k, v in x.items() if k != "updatedAt"}, sort_keys=True, ensure_ascii=False) for x in L)
     check("import restores identical vocab + SRS progress", norm(after) == norm(before))
     check("import restores seen CET words", page.evaluate("ER.lsGet('er_cet_seen',{})") == seen_before)
     # merge keeps newer progress: modify locally, import old backup -> local newer wins
@@ -325,7 +328,7 @@ with sync_playwright() as p:
     m = browser.new_context(viewport={"width": 390, "height": 820}, has_touch=True, is_mobile=True, device_scale_factor=2)
     mock_routes(m)
     mp = m.new_page(); attach(mp, "mobile")
-    mp.goto(f"{BASE}?today=2026-10-23#/read"); mp.wait_for_selector("#articleReader h2")
+    mp.goto(f"{BASE}?today=2026-10-23#/read/2026-10-23"); mp.wait_for_selector("#articleReader h2")
     mp.locator('#articleReader .w[data-w="sobering"]').first.tap()
     mp.wait_for_function("document.querySelector('#pop.show') && !document.querySelector('#pop .spinner')")
     check("mobile tap opens bottom-sheet popup", mp.evaluate("document.getElementById('pop').classList.contains('sheet')"))
@@ -335,14 +338,14 @@ with sync_playwright() as p:
     mp.wait_for_selector("#btnGotIt"); mp.screenshot(path="/tmp/er_mobile_card.png")
     mp.tap("#btnGotIt"); mp.wait_for_selector("#btnGotIt"); mp.tap("#btnGotIt")
     mp.wait_for_selector("#qCard"); mp.screenshot(path="/tmp/er_mobile_test.png")
-    page.goto(f"{BASE}?today=2026-10-23#/read"); page.wait_for_selector("#articleReader h2"); page.screenshot(path="/tmp/er_desktop_read.png", full_page=True)
+    page.goto(f"{BASE}?today=2026-10-23#/read/2026-10-23"); page.wait_for_selector("#articleReader h2"); page.screenshot(path="/tmp/er_desktop_read.png", full_page=True)
 
 
     # ---------- 9. phrases / short sentences (fresh profile) ----------
     pc = browser.new_context(accept_downloads=True, viewport={"width": 1100, "height": 900})
     mock_routes(pc)
     pp = pc.new_page(); attach(pp, "phrase")
-    goto(pp, "2026-10-23"); pp.wait_for_selector("#articleReader h2")
+    goto(pp, "2026-10-23", "#/read/2026-10-23"); pp.wait_for_selector("#articleReader h2")
     AR = "#articleReader"
     # single-word drag selection on desktop: behaves as before (nothing pops up)
     box_ = pp.locator(f'{AR} .w[data-w="sobering"]').first.bounding_box()
@@ -496,7 +499,7 @@ with sync_playwright() as p:
     mc = browser.new_context(viewport={"width": 390, "height": 760}, has_touch=True, is_mobile=True, device_scale_factor=2)
     mock_routes(mc)
     mq = mc.new_page(); attach(mq, "mobile-phrase")
-    mq.goto(f"{BASE}?today=2026-10-23#/read"); mq.wait_for_selector("#articleReader h2")
+    mq.goto(f"{BASE}?today=2026-10-23#/read/2026-10-23"); mq.wait_for_selector("#articleReader h2")
     check("mobile: native text selection enabled in reader", mq.evaluate("getComputedStyle(document.getElementById('articleReader')).userSelect") != "none")
     mq.locator('#articleReader .w[data-w="sobering"]').first.tap()
     mq.wait_for_function("document.querySelector('#pop.show') && !document.querySelector('#pop .spinner')")
@@ -541,6 +544,161 @@ with sync_playwright() as p:
     mo = [e for e in mlog if e["type"] == "order"]
     check("mobile: word-order question by tapping tiles", mo and mo[0]["ok"], str(mlog))
     check("mobile: all phrase answers correct on phone", all(e["ok"] for e in mlog) and len(mlog) == 2, str(mlog))
+
+    # ---------- 14. data-loss safeguards ----------
+    sc = browser.new_context(accept_downloads=True); mock_routes(sc)
+    sp = sc.new_page(); attach(sp, "safeguard")
+    goto(sp, "2026-10-26", "#/vocab"); sp.wait_for_selector("#btnBackup")
+    sp.evaluate("""()=>{ER.addWord({word:'alpha',zh:'甲',source:'manual'});ER.addWord({word:'make ends meet',type:'phrase',zh:'勉强维持生计',source:'manual'});}""")
+    for d, h in [("2026-10-27", "#/read"), ("2026-10-27", "#/review"), ("2026-10-28", "#/vocab"), ("2026-10-28", "#/paste"), ("2026-10-29", "#/review")]:
+        goto(sp, d, h); sp.wait_for_timeout(200)
+    check("new-day rollover keeps vocab (D+1..D+3, all pages)", [v["word"] for v in vocab(sp)] == ["alpha", "make ends meet"], str(vocab(sp)))
+    check("every item gets updatedAt", all(v.get("updatedAt") for v in vocab(sp)))
+    check("automatic backup snapshot kept", sp.evaluate("ER.lsGet('er_vocab_backup',{}).n") == 2)
+    # stale in-memory copy (missed storage event, e.g. restored from back/forward cache): must not clobber newer data
+    sp.evaluate("""()=>{var a=JSON.parse(localStorage.getItem('er_vocab'));a.push({word:'from other tab',type:'phrase',zh:'别的标签页',srs:{stage:0,due:'2026-10-29'},updatedAt:Date.now()});localStorage.setItem('er_vocab',JSON.stringify(a));}""")
+    sp.evaluate("ER.addWord({word:'gamma',zh:'丙',source:'manual'})")
+    stored = sp.evaluate("JSON.parse(localStorage.getItem('er_vocab')).map(v=>v.word)")
+    check("stale tab save merges instead of overwriting", set(stored) == {"alpha", "make ends meet", "from other tab", "gamma"}, str(stored))
+    # empty list never saved over non-empty storage
+    sp.evaluate("""()=>{localStorage.setItem('er_vocab',JSON.stringify([{word:'zz1',srs:{}}]));}""")
+    goto(sp, "2026-10-29", "#/vocab"); sp.reload(); sp.wait_for_selector("#btnBackup")
+    sp.evaluate("""()=>{localStorage.setItem('er_vocab',JSON.stringify([{word:'kept',srs:{}}]));ER.getVocab().length=0;ER.saveVocab();}""")
+    check("empty in-memory list never overwrites stored words", sp.evaluate("JSON.parse(localStorage.getItem('er_vocab')).map(v=>v.word)") == ["kept"])
+    # explicit deletion of the last word is allowed
+    goto(sp, "2026-10-29", "#/vocab"); sp.reload(); sp.wait_for_selector("#btnBackup"); sp.evaluate("ER.removeWord('kept')")
+    check("explicit deletion of last word allowed", sp.evaluate("JSON.parse(localStorage.getItem('er_vocab')).length") == 0)
+    # corrupt JSON -> raw kept aside, restore button from automatic backup
+    sp.evaluate("""()=>{ER.addWord({word:'alpha',zh:'甲',source:'manual'});ER.addWord({word:'beta',zh:'乙',source:'manual'});localStorage.setItem('er_vocab','[{"word":"alpha",');}""")
+    goto(sp, "2026-10-29", "#/vocab"); sp.reload(); sp.wait_for_selector("#btnBackup")
+    check("corrupt vocab JSON is preserved aside", sp.evaluate("localStorage.getItem('er_vocab_corrupt')") == '[{"word":"alpha",')
+    check("restore button shown when vocab empty but backup exists", sp.locator("#btnRestoreAuto").is_visible() and "2" in sp.inner_text("#restoreBox"))
+    sp.click("#btnRestoreAuto")
+    check("restore from automatic backup", sorted(v["word"] for v in vocab(sp)) == ["alpha", "beta"] and sp.locator(".vitem").count() == 2)
+    # visibilitychange re-reads storage written elsewhere
+    sp.evaluate("""()=>{var a=JSON.parse(localStorage.getItem('er_vocab'));a.push({word:'delta',srs:{},updatedAt:Date.now()});localStorage.setItem('er_vocab',JSON.stringify(a));document.dispatchEvent(new Event('visibilitychange'));}""")
+    check("tab becoming visible reloads vocab from storage", word(sp, "delta") is not None)
+    check("storage.persist requested (hint shown)", sp.inner_text("#persistHint") != "")
+    # copy / paste backup code
+    sc.grant_permissions(["clipboard-read", "clipboard-write"])
+    sp.click("#btnCopyCode")
+    code = sp.input_value("#backupCode")
+    check("backup code generated", json.loads(code)["app"] == "english-reader" and len(json.loads(code)["data"]["vocab"]) == 3)
+    sc2 = browser.new_context(); mock_routes(sc2); sp2 = sc2.new_page(); attach(sp2, "paste-import")
+    goto(sp2, "2026-10-29", "#/vocab"); sp2.wait_for_selector("#btnPasteImport")
+    sp2.click("#btnPasteImport"); sp2.fill("#backupCode", code); sp2.click("#btnPasteImport")
+    check("paste backup code imports (merge)", sorted(v["word"] for v in vocab(sp2)) == ["alpha", "beta", "delta"])
+    sp2.click("#btnPasteImport"); sp2.fill("#backupCode", "{broken"); sp2.click("#btnPasteImport")
+    check("bad backup code leaves data intact", len(vocab(sp2)) == 3)
+    sc2.close(); sc.close()
+
+    # ---------- 15. GitHub gist sync (GitHub API mocked) ----------
+    TOKEN = "ghp_" + "x" * 36   # fake test token
+    class FakeGitHub:
+        def __init__(self):
+            self.gists, self.mode, self.calls, self.n = {}, "ok", [], 0
+        def reply(self, route, status, body):
+            route.fulfill(status=status, content_type="application/json", body=json.dumps(body),
+                          headers={"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization,content-type,accept",
+                                   "Access-Control-Allow-Methods": "GET,POST,PATCH,OPTIONS", "Access-Control-Expose-Headers": "x-ratelimit-remaining,x-ratelimit-reset"})
+        def handle(self, route):
+            req = route.request; path = req.url.split("api.github.com", 1)[1].split("?")[0]
+            if req.method == "OPTIONS":
+                return self.reply(route, 204, {})
+            self.calls.append((req.method, path))
+            if self.mode == "offline":
+                return route.abort("internetdisconnected")
+            if self.mode == "401" or req.headers.get("authorization") != "Bearer " + TOKEN:
+                return self.reply(route, 401, {"message": "Bad credentials"})
+            self.n += 1; now = f"2026-10-27T00:00:{self.n:02d}Z"
+            def full(g):
+                return {"id": g["id"], "updated_at": g["updated_at"], "public": False,
+                        "files": {k: {"filename": k, "content": v, "truncated": False} for k, v in g["files"].items()}}
+            if path == "/gists" and req.method == "GET":
+                return self.reply(route, 200, [{"id": g["id"], "updated_at": g["updated_at"], "files": {k: {"filename": k} for k in g["files"]}} for g in self.gists.values()])
+            if path == "/gists" and req.method == "POST":
+                b = json.loads(req.post_data); gid = f"gist{sum(1 for k in self.gists if k.startswith('gist')) + 1}"
+                self.gists[gid] = {"id": gid, "updated_at": now, "public": b.get("public"), "files": {k: v["content"] for k, v in b["files"].items()}}
+                return self.reply(route, 201, full(self.gists[gid]))
+            gid = path.rsplit("/", 1)[-1]
+            if gid not in self.gists:
+                return self.reply(route, 404, {"message": "Not Found"})
+            if req.method == "PATCH":
+                b = json.loads(req.post_data)
+                for k, v in b["files"].items():
+                    self.gists[gid]["files"][k] = v["content"]
+                self.gists[gid]["updated_at"] = now
+            return self.reply(route, 200, full(self.gists[gid]))
+        def data(self):
+            g = [g for g in self.gists.values() if "english-reader-data.json" in g["files"]][0]; return json.loads(g["files"]["english-reader-data.json"])
+    gh = FakeGitHub()
+    gh.gists["other"] = {"id": "other", "updated_at": "2020-01-01T00:00:00Z", "files": {"notes.md": "unrelated"}}
+    def device(tag):
+        c = browser.new_context(); mock_routes(c); c.route(re.compile(r"https://api\.github\.com/.*"), gh.handle)
+        pg = c.new_page(); attach(pg, tag); pg.on("dialog", lambda d: d.accept())
+        goto(pg, "2026-10-27", "#/vocab"); pg.wait_for_selector("#syncCard")
+        pg.evaluate("ER.SYNC_DEBOUNCE=150")
+        return c, pg
+    def connect(pg):
+        pg.fill("#syncToken", TOKEN); pg.click("#btnSyncConnect")
+        pg.wait_for_function("(ER.lsGet('er_sync_meta',{}).state||'')!=='syncing' && ER.lsGet('er_sync_meta',{}).state")
+    def sync(pg):
+        return pg.evaluate("ER.syncNow('test')")
+    def words(pg):
+        return sorted(v["word"] for v in vocab(pg))
+    ca, A = device("deviceA")
+    check("sync card: token link pre-fills gist scope", A.get_attribute("#syncTokenLink", "href") == "https://github.com/settings/tokens/new?scopes=gist&description=english-reader-sync")
+    A.evaluate("""()=>{ER.addWord({word:'alpha',zh:'甲',source:'manual'});ER.addWord({word:'beta',zh:'乙',source:'manual'});ER.addWord({word:'make ends meet',type:'phrase',zh:'勉强维持生计',source:'manual'});}""")
+    connect(A)
+    check("first connect creates one secret gist", sum(1 for m, p_ in gh.calls if m == "POST") == 1 and gh.gists["gist1"]["public"] is False)
+    check("gist contains vocab incl. phrase", sorted(v["word"] for v in gh.data()["vocab"]) == ["alpha", "beta", "make ends meet"])
+    check("sync status shows last sync time", "上次同步" in A.inner_text("#syncStatus"), A.inner_text("#syncStatus"))
+    check("token is stored only locally and not in backups", TOKEN not in A.evaluate("JSON.stringify(ER.buildBackup())") and TOKEN not in json.dumps(gh.data()))
+    cb, Bp = device("deviceB")
+    Bp.evaluate("ER.addWord({word:'zeta',zh:'己',source:'manual'})")
+    connect(Bp)
+    check("second device finds existing gist (no new gist)", sum(1 for m, p_ in gh.calls if m == "POST") == 1 and Bp.evaluate("ER.lsGet('er_sync_meta',{}).gistId") == "gist1")
+    check("second device gets union of both devices", words(Bp) == ["alpha", "beta", "make ends meet", "zeta"], str(words(Bp)))
+    sync(A)
+    check("first device receives second device's word", words(A) == ["alpha", "beta", "make ends meet", "zeta"])
+    # deletion propagates (tombstone), debounced auto-sync after change
+    A.evaluate("ER.removeWord('alpha')")
+    A.wait_for_function("ER.lsGet('er_sync_meta',{}).state==='ok' && !(JSON.stringify(ER.syncState().vocab).includes('\"alpha\"'))")
+    A.wait_for_timeout(800)
+    check("deletion stored as tombstone in gist", "alpha" in gh.data()["tombstones"] and "alpha" not in [v["word"] for v in gh.data()["vocab"]])
+    sync(Bp)
+    check("deletion propagates to other device", "alpha" not in words(Bp) and "beta" in words(Bp))
+    # newer review progress wins; daily new-word progress merges
+    Bp.evaluate("""()=>{var v=ER.findWord('beta');v.srs=SRS.answer(v.srs,true,'2026-10-27');v.srs=SRS.answer(v.srs,true,'2026-10-28');ER.saveVocab();ER.lsSet('er_daily',{date:'2026-10-27',newDone:7});}""")
+    sync(Bp); sync(A)
+    check("newer SRS progress wins on other device", word(A, "beta")["srs"]["stage"] == 2, str(word(A, "beta")["srs"]))
+    check("daily new-word progress synced", A.evaluate("ER.lsGet('er_daily',{}).newDone") == 7)
+    # concurrent edits on both devices to different words -> both kept
+    A.evaluate("ER.findWord('zeta').zh='己（A 改）';ER.saveVocab()")
+    Bp.evaluate("ER.addWord({word:'kappa',zh:'癸',source:'manual'})")
+    sync(A); sync(Bp); sync(A)
+    check("edits on both devices merged", word(Bp, "zeta")["zh"] == "己（A 改）" and word(A, "kappa") is not None)
+    # settings sync (newer wins)
+    A.click("#btnSettings"); A.select_option("#optAccent", "en-GB"); A.click("#btnCloseSettings"); sync(A); sync(Bp)
+    check("settings synced", Bp.evaluate("ER.settings.accent") == "en-GB")
+    # offline: local data untouched, error shown, later retry succeeds
+    gh.mode = "offline"
+    A.evaluate("ER.addWord({word:'offline word',type:'phrase',zh:'离线',source:'manual'})")
+    ok = sync(A)
+    check("offline sync fails gracefully", ok is False and "网络" in A.inner_text("#syncStatus"), A.inner_text("#syncStatus"))
+    A.reload(); A.wait_for_selector("#syncCard"); A.wait_for_timeout(500)
+    check("offline: local data kept after failed sync + reload", "offline word" in words(A) and "kappa" in words(A))
+    gh.mode = "401"
+    ok = sync(A)
+    check("401 shows token error, keeps local data", ok is False and "token" in A.inner_text("#syncStatus") and "offline word" in words(A))
+    gh.mode = "ok"
+    sync(A); sync(Bp)
+    check("after reconnect, offline change reaches other device", "offline word" in words(Bp))
+    # disconnect keeps data
+    A.click("#btnSyncNow"); A.wait_for_timeout(300)
+    A.click("#btnSyncOff")
+    check("disconnect removes token, keeps data", A.evaluate("localStorage.getItem('er_sync_token')") is None and "offline word" in words(A) and A.locator("#syncSetup").is_visible())
+    ca.close(); cb.close()
 
     # ---------- 14. live lookup (optional, real network) ----------
     if LIVE:

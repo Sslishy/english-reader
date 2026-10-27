@@ -45,6 +45,7 @@
         <h2>📒 生词本 <span class="muted" id="vocabCount2"></span></h2>
         <button id="btnHideZh">遮住中文</button>
         <button id="btnExport">导出 CSV</button>
+        <button id="btnGoBackup">💾 备份</button>
       </div>
       <div class="row">
         <input type="text" id="vocabFilter" placeholder="搜索生词…" style="flex:1;min-width:120px">
@@ -71,7 +72,7 @@
       </details>
       <div id="vocabList"></div>
     </div>
-    <div class="card">
+    <div class="card" id="backupCard">
       <h3 class="card-title">💾 备份 / 迁移（手机 ⇄ 电脑）</h3>
       <p class="hint">所有数据只保存在本浏览器（localStorage）。换设备前先「导出备份」，在另一台设备上「导入」即可。备份包含生词本、复习进度、已学四六级词和设置。</p>
       <div class="row">
@@ -80,6 +81,31 @@
         <button id="btnImportReplace" class="danger">⬆️ 导入（覆盖本地）</button>
         <input type="file" id="importFile" accept="application/json,.json" hidden>
       </div>
+      <div class="row">
+        <button id="btnCopyCode">📋 复制备份码</button>
+        <button id="btnPasteImport">📥 粘贴备份码导入（合并）</button>
+      </div>
+      <textarea id="backupCode" class="backup-code" rows="4" hidden spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      <p class="hint">手机上不方便下载文件时，用「备份码」：复制后粘贴到备忘录或微信「文件传输助手」保存；在另一台设备上粘贴导入即可。本机还会自动保留最近一次的生词本副本，生词本被意外清空时可在上方一键恢复（清除浏览器数据时副本也会被清掉）。</p>
+      <p class="hint" id="persistHint"></p>
+    </div>
+    <div class="card" id="syncCard">
+      <h3 class="card-title">☁️ GitHub 同步（电脑 ⇄ 手机自动同步）</h3>
+      <p class="hint">把生词本、短语、复习进度、每日新词进度和设置自动保存到你自己 GitHub 账号里的一个私密（secret）gist，多台设备填同一个 token 就会自动合并同步。</p>
+      <div id="syncSetup">
+        <ol class="sync-steps">
+          <li>登录 GitHub 后打开 <a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=english-reader-sync" target="_blank" rel="noopener" id="syncTokenLink">生成 token 页面</a>（已自动勾选 <b>gist</b>，其他权限都不要勾）。</li>
+          <li>「Expiration」可选 90 天或 No expiration，拉到底点「Generate token」。</li>
+          <li>复制以 <code>ghp_</code> 开头的 token，粘贴到下面，点「连接并同步」。另一台设备重复第 3 步（可用同一个 token）。</li>
+        </ol>
+        <p class="hint">也可以用 fine-grained token：权限里只给 <b>Gists：Read and write</b>。</p>
+        <div class="row"><input type="password" id="syncToken" placeholder="粘贴 GitHub token（ghp_…）" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" style="flex:1;min-width:200px"><button class="primary" id="btnSyncConnect">连接并同步</button></div>
+      </div>
+      <div id="syncConnected" hidden>
+        <div class="row"><button class="primary" id="btnSyncNow">🔄 立即同步</button><button id="btnSyncOff" class="danger">断开同步</button></div>
+      </div>
+      <p class="hint" id="syncStatus"></p>
+      <p class="hint">🔒 token 只保存在这台设备的浏览器里，不会上传到别处；它只有 gist 权限，不能动你的代码仓库。secret gist 不会公开列出，但知道链接的人可以看到内容，请不要把 gist 链接或 token 发给别人。不用时可在 GitHub 的 token 设置里随时删除它。</p>
     </div>
   </section>
 
@@ -126,6 +152,7 @@
         <input type="email" id="optEmail" placeholder="填写你自己的邮箱可提高每日翻译额度" style="min-width:220px">
       </label>
     </div>
+    <p class="hint">☁️ 多设备同步 / 备份：见「📒 生词本」页底部的「GitHub 同步」和「备份 / 迁移」。</p>
     <p class="hint">中文释义来自内置四六级词库、中文维基词典（zh.wiktionary）与 MyMemory 免费翻译接口（匿名每天约 5000 字符额度；填写邮箱可提高到约 50000）。都没有结果时，改用英文维基词典中的中文译词（可能是繁体）。英文释义来自 Free Dictionary API，不可用时自动改用维基词典。查过的词会缓存在本地。</p>
   </div>
 </div>
@@ -137,6 +164,7 @@
 <script src="js/srs.js"></script>
 <script src="js/app.js"></script>
 <script src="js/review.js"></script>
-<script>ER.start();</script>
+<script src="js/sync.js"></script>
+<script>ER.start(); ER.startSync();</script>
 </body>
 </html>

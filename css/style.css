@@ -189,3 +189,7 @@ body.sheet-open main{padding-bottom:55vh}
   .tabs a{font-size:14px;padding:8px 6px}
   .qword{font-size:30px}
 }
+.backup-code{min-height:0;height:auto;font:12px/1.4 ui-monospace,Menlo,monospace;margin-top:8px;word-break:break-all}
+.restore-box{text-align:center;border:1px dashed var(--line);border-radius:10px;padding:12px;margin:0 0 16px;background:#fffdf3}
+.sync-steps{margin:6px 0 4px 20px;padding:0;font-size:14px;line-height:1.7}
+.sync-status.is-err{color:#b3261e}
