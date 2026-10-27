@@ -796,7 +796,7 @@ with sync_playwright() as p:
       // load examples via a dummy session prep: call resolve after ensuring lists
       return await fetch('data/examples-cet6.json').then(r=>r.json()).then(d=>({n:Object.keys(d.examples||{}).length, acutely:d.examples.acutely}));
     }""")
-    check("examples-cet6.json has fill-ins", ex["n"] >= 100 and ex["acutely"] and "acutely" in ex["acutely"]["en"].lower(), str(ex)[:200])
+    check("examples-cet6.json has natural fill-ins", ex["n"] >= 100 and ex["acutely"] and "acutely" in ex["acutely"]["en"].lower() and "important for everyday life" not in ex["acutely"]["en"] and "felt the pain acutely" in ex["acutely"]["en"].lower(), str(ex)[:240])
     qc.close()
 
     # mobile letter-gap inputs

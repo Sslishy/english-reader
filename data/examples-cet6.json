@@ -1,457 +1,445 @@
 {
   "meta": {
     "level": "cet6",
-    "count": 112,
-    "note": "Fill-in examples for CET entries that lack source sentences. Lazy-loaded by review cloze."
+    "count": 109,
+    "note": "Hand-written B1 example sentences for CET entries that lack source examples. Lazy-loaded by review cloze."
   },
   "examples": {
     "acutely": {
-      "en": "The numbers changed acutely last year.",
-      "zh": "去年这些数字敏锐地变化了。"
+      "en": "He felt the pain acutely after the long climb.",
+      "zh": "长途攀爬后，他敏锐地感到疼痛。"
     },
     "addict": {
-      "en": "We need to addict before we make a final decision.",
-      "zh": "我们在做最终决定前需要上瘾。"
+      "en": "Video games can addict young players if they play for hours.",
+      "zh": "如果一玩就是几小时，电子游戏可能让年轻人上瘾。"
     },
     "adversely": {
-      "en": "She explained the main idea adversely again.",
-      "zh": "她再次不利地解释了主要意思。"
-    },
-    "casualty": {
-      "en": "This casualty is important for everyday life.",
-      "zh": "这个伤亡人数对日常生活很重要。"
-    },
-    "conclusive": {
-      "en": "The situation looks conclusive to many young people.",
-      "zh": "对很多年轻人来说，这种情况看起来很得出结论的。"
-    },
-    "counselor": {
-      "en": "They talked about the counselor for a long time.",
-      "zh": "他们就这个咨询顾问讨论了很久。"
-    },
-    "derail": {
-      "en": "She tried to derail in a calm and careful way.",
-      "zh": "她试着冷静而仔细地脱轨。"
-    },
-    "disproportionately": {
-      "en": "He spoke disproportionately during the short meeting.",
-      "zh": "他在短会上比例不均地发言。"
-    },
-    "drastically": {
-      "en": "She explained the main idea drastically again.",
-      "zh": "她再次激烈地解释了主要意思。"
-    },
-    "dysfunction": {
-      "en": "They talked about the dysfunction for a long time.",
-      "zh": "他们就这个失灵讨论了很久。"
-    },
-    "entrepreneurship": {
-      "en": "They talked about the entrepreneurship for a long time.",
-      "zh": "他们就这个企业管理讨论了很久。"
-    },
-    "exceptional": {
-      "en": "Her answer sounded exceptional but still useful.",
-      "zh": "她的回答听起来例外的，但仍然有用。"
-    },
-    "fearlessly": {
-      "en": "He spoke fearlessly during the short meeting.",
-      "zh": "他在短会上无畏地发言。"
-    },
-    "handgun": {
-      "en": "This handgun is important for everyday life.",
-      "zh": "这个手枪对日常生活很重要。"
-    },
-    "ideologically": {
-      "en": "The numbers changed ideologically last year.",
-      "zh": "去年这些数字意识形态上地变化了。"
-    },
-    "intensely": {
-      "en": "The numbers changed intensely last year.",
-      "zh": "去年这些数字强烈地变化了。"
-    },
-    "preindustrial": {
-      "en": "It was a preindustrial day for the whole family.",
-      "zh": "对全家来说，那是工业化以前的的一天。"
-    },
-    "premium": {
-      "en": "A clear premium can help students learn faster.",
-      "zh": "清楚的奖金能帮助学生学得更快。"
-    },
-    "reimbursement": {
-      "en": "They talked about the reimbursement for a long time.",
-      "zh": "他们就这个返还费用讨论了很久。"
-    },
-    "shepherd": {
-      "en": "We need to shepherd before we make a final decision.",
-      "zh": "我们在做最终决定前需要引导。"
-    },
-    "straightforward": {
-      "en": "It was a straightforward day for the whole family.",
-      "zh": "对全家来说，那是直接的的一天。"
-    },
-    "turbulence": {
-      "en": "A clear turbulence can help students learn faster.",
-      "zh": "清楚的喧嚣能帮助学生学得更快。"
-    },
-    "fertility": {
-      "en": "A clear fertility can help students learn faster.",
-      "zh": "清楚的多产能帮助学生学得更快。"
-    },
-    "successively": {
-      "en": "The numbers changed successively last year.",
-      "zh": "去年这些数字接连着地变化了。"
-    },
-    "underrepresented": {
-      "en": "The situation looks underrepresented to many young people.",
-      "zh": "对很多年轻人来说，这种情况看起来很未被充分代表的。"
-    },
-    "simultaneously": {
-      "en": "The numbers changed simultaneously last year.",
-      "zh": "去年这些数字同步地变化了。"
-    },
-    "notoriously": {
-      "en": "The numbers changed notoriously last year.",
-      "zh": "去年这些数字臭名昭著地变化了。"
-    },
-    "literacy": {
-      "en": "A clear literacy can help students learn faster.",
-      "zh": "清楚的教育能帮助学生学得更快。"
-    },
-    "immersive": {
-      "en": "The situation looks immersive to many young people.",
-      "zh": "对很多年轻人来说，这种情况看起来很沉浸的。"
-    },
-    "tradeoff": {
-      "en": "They talked about the tradeoff for a long time.",
-      "zh": "他们就这个权衡讨论了很久。"
-    },
-    "incur": {
-      "en": "People often incur when they face a hard problem.",
-      "zh": "人们面对难题时常常会引起。"
-    },
-    "obscurity": {
-      "en": "This obscurity is important for everyday life.",
-      "zh": "这个默默无闻对日常生活很重要。"
-    },
-    "refrain": {
-      "en": "She tried to refrain in a calm and careful way.",
-      "zh": "她试着冷静而仔细地抑制。"
-    },
-    "hack": {
-      "en": "We need to hack before we make a final decision.",
-      "zh": "我们在做最终决定前需要黑客攻击。"
-    },
-    "deterioration": {
-      "en": "This deterioration is important for everyday life.",
-      "zh": "这个恶化对日常生活很重要。"
-    },
-    "shrank": {
-      "en": "We need to shrank before we make a final decision.",
-      "zh": "我们在做最终决定前需要收缩(shrink过去式)。"
-    },
-    "rigor": {
-      "en": "A clear rigor can help students learn faster.",
-      "zh": "清楚的严格能帮助学生学得更快。"
-    },
-    "degeneration": {
-      "en": "A clear degeneration can help students learn faster.",
-      "zh": "清楚的退化能帮助学生学得更快。"
+      "en": "Air pollution can adversely affect children's health.",
+      "zh": "空气污染会对儿童健康产生不利影响。"
     },
     "affiliation": {
-      "en": "A clear affiliation can help students learn faster.",
-      "zh": "清楚的隶属关系能帮助学生学得更快。"
-    },
-    "recruiter": {
-      "en": "They talked about the recruiter for a long time.",
-      "zh": "他们就这个招聘者讨论了很久。"
-    },
-    "landmark": {
-      "en": "Her answer sounded landmark but still useful.",
-      "zh": "她的回答听起来有重大意义或影响的，但仍然有用。"
-    },
-    "alternatively": {
-      "en": "The numbers changed alternatively last year.",
-      "zh": "去年这些数字二选一地变化了。"
-    },
-    "chronically": {
-      "en": "She explained the main idea chronically again.",
-      "zh": "她再次慢性地解释了主要意思。"
-    },
-    "automatically": {
-      "en": "She explained the main idea Automatically again.",
-      "zh": "她再次自动地解释了主要意思。"
-    },
-    "proximately": {
-      "en": "She explained the main idea proximately again.",
-      "zh": "她再次近似解释了主要意思。"
-    },
-    "lobbyist": {
-      "en": "This lobbyist is important for everyday life.",
-      "zh": "这个游说者对日常生活很重要。"
-    },
-    "datum": {
-      "en": "A clear datum can help students learn faster.",
-      "zh": "清楚的资料能帮助学生学得更快。"
-    },
-    "torque": {
-      "en": "They talked about the torque for a long time.",
-      "zh": "他们就这个转（力）矩讨论了很久。"
-    },
-    "sofa": {
-      "en": "A clear sofa can help students learn faster.",
-      "zh": "清楚的长沙发能帮助学生学得更快。"
-    },
-    "printer": {
-      "en": "They talked about the printer for a long time.",
-      "zh": "他们就这个印刷工讨论了很久。"
-    },
-    "oxide": {
-      "en": "This oxide is important for everyday life.",
-      "zh": "这个氧化物对日常生活很重要。"
-    },
-    "narration": {
-      "en": "They talked about the narration for a long time.",
-      "zh": "他们就这个叙述讨论了很久。"
-    },
-    "crab": {
-      "en": "This crab is important for everyday life.",
-      "zh": "这个蟹对日常生活很重要。"
-    },
-    "tape": {
-      "en": "We need to tape before we make a final decision.",
-      "zh": "我们在做最终决定前需要系。"
-    },
-    "stern": {
-      "en": "This stern is important for everyday life.",
-      "zh": "这个艉对日常生活很重要。"
-    },
-    "venus": {
-      "en": "A clear Venus can help students learn faster.",
-      "zh": "清楚的维纳斯能帮助学生学得更快。"
-    },
-    "mast": {
-      "en": "They talked about the mast for a long time.",
-      "zh": "他们就这个桅杆讨论了很久。"
-    },
-    "hull": {
-      "en": "They talked about the hull for a long time.",
-      "zh": "他们就这个外壳讨论了很久。"
-    },
-    "purify": {
-      "en": "We need to purify before we make a final decision.",
-      "zh": "我们在做最终决定前需要提纯。"
-    },
-    "treasurer": {
-      "en": "They talked about the treasurer for a long time.",
-      "zh": "他们就这个司库讨论了很久。"
-    },
-    "buffalo": {
-      "en": "They talked about the buffalo for a long time.",
-      "zh": "他们就这个水牛讨论了很久。"
-    },
-    "wrestle": {
-      "en": "A clear wrestle can help students learn faster.",
-      "zh": "清楚的摔交能帮助学生学得更快。"
-    },
-    "pantry": {
-      "en": "They talked about the pantry for a long time.",
-      "zh": "他们就这个食品柜讨论了很久。"
-    },
-    "graphite": {
-      "en": "This graphite is important for everyday life.",
-      "zh": "这个石墨对日常生活很重要。"
-    },
-    "reptile": {
-      "en": "A clear reptile can help students learn faster.",
-      "zh": "清楚的爬行动物能帮助学生学得更快。"
-    },
-    "ohm": {
-      "en": "They talked about the ohm for a long time.",
-      "zh": "他们就这个欧姆讨论了很久。"
-    },
-    "waitress": {
-      "en": "This waitress is important for everyday life.",
-      "zh": "这个女侍者对日常生活很重要。"
-    },
-    "pumpkin": {
-      "en": "A clear pumpkin can help students learn faster.",
-      "zh": "清楚的南瓜能帮助学生学得更快。"
-    },
-    "module": {
-      "en": "A clear module can help students learn faster.",
-      "zh": "清楚的模块能帮助学生学得更快。"
-    },
-    "destine": {
-      "en": "People often destine when they face a hard problem.",
-      "zh": "人们面对难题时常常会命定。"
-    },
-    "brightness": {
-      "en": "They talked about the brightness for a long time.",
-      "zh": "他们就这个明亮讨论了很久。"
-    },
-    "reed": {
-      "en": "A clear reed can help students learn faster.",
-      "zh": "清楚的芦笛能帮助学生学得更快。"
-    },
-    "bridle": {
-      "en": "This bridle is important for everyday life.",
-      "zh": "这个马笼头对日常生活很重要。"
-    },
-    "flux": {
-      "en": "A clear flux can help students learn faster.",
-      "zh": "清楚的流能帮助学生学得更快。"
-    },
-    "allied": {
-      "en": "Her answer sounded allied but still useful.",
-      "zh": "她的回答听起来联合的，但仍然有用。"
-    },
-    "ion": {
-      "en": "This ion is important for everyday life.",
-      "zh": "这个离子对日常生活很重要。"
-    },
-    "firmness": {
-      "en": "This firmness is important for everyday life.",
-      "zh": "这个坚固对日常生活很重要。"
-    },
-    "glider": {
-      "en": "A clear glider can help students learn faster.",
-      "zh": "清楚的滑翔机能帮助学生学得更快。"
-    },
-    "granite": {
-      "en": "It was a granite day for the whole family.",
-      "zh": "对全家来说，那是花岗岩的一天。"
-    },
-    "correlate": {
-      "en": "A clear correlate can help students learn faster.",
-      "zh": "清楚的互相关联的事物能帮助学生学得更快。"
-    },
-    "hurrah": {
-      "en": "You will see \"hurrah\" in many news articles.",
-      "zh": "你会在很多新闻文章里看到“hurrah”。"
-    },
-    "boiler": {
-      "en": "This boiler is important for everyday life.",
-      "zh": "这个锅炉对日常生活很重要。"
-    },
-    "valuable": {
-      "en": "They talked about the valuable for a long time.",
-      "zh": "他们就这个贵重物品讨论了很久。"
-    },
-    "coffin": {
-      "en": "They talked about the coffin for a long time.",
-      "zh": "他们就这个棺材讨论了很久。"
-    },
-    "energize": {
-      "en": "People often energize when they face a hard problem.",
-      "zh": "人们面对难题时常常会供给…能量。"
-    },
-    "propagation": {
-      "en": "A clear propagation can help students learn faster.",
-      "zh": "清楚的繁殖能帮助学生学得更快。"
-    },
-    "capacitance": {
-      "en": "A clear capacitance can help students learn faster.",
-      "zh": "清楚的电容能帮助学生学得更快。"
-    },
-    "burner": {
-      "en": "This burner is important for everyday life.",
-      "zh": "这个煤气头对日常生活很重要。"
-    },
-    "gorilla": {
-      "en": "A clear gorilla can help students learn faster.",
-      "zh": "清楚的大猩猩能帮助学生学得更快。"
-    },
-    "herald": {
-      "en": "A clear herald can help students learn faster.",
-      "zh": "清楚的传令官能帮助学生学得更快。"
-    },
-    "lathe": {
-      "en": "They talked about the lathe for a long time.",
-      "zh": "他们就这个车床讨论了很久。"
-    },
-    "tactics": {
-      "en": "A clear tactics can help students learn faster.",
-      "zh": "清楚的战术能帮助学生学得更快。"
-    },
-    "panther": {
-      "en": "They talked about the panther for a long time.",
-      "zh": "他们就这个豹讨论了很久。"
-    },
-    "lily": {
-      "en": "They talked about the lily for a long time.",
-      "zh": "他们就这个百合讨论了很久。"
-    },
-    "blond": {
-      "en": "They talked about the blond for a long time.",
-      "zh": "他们就这个白肤金发碧眼的人讨论了很久。"
-    },
-    "dwarf": {
-      "en": "They talked about the dwarf for a long time.",
-      "zh": "他们就这个矮子讨论了很久。"
-    },
-    "moslem": {
-      "en": "This Moslem is important for everyday life.",
-      "zh": "这个穆斯林对日常生活很重要。"
+      "en": "Please write your school affiliation on the form.",
+      "zh": "请在表格上填写你所属的学校。"
     },
     "afflict": {
-      "en": "She tried to afflict in a calm and careful way.",
-      "zh": "她试着冷静而仔细地使苦恼。"
+      "en": "Drought continues to afflict farmers in the dry region.",
+      "zh": "干旱继续折磨着干旱地区的农民。"
     },
-    "assimilation": {
-      "en": "They talked about the assimilation for a long time.",
-      "zh": "他们就这个同化讨论了很久。"
+    "allied": {
+      "en": "The two allied countries worked together on the project.",
+      "zh": "这两个盟国在该项目上合作。"
     },
-    "retention": {
-      "en": "This retention is important for everyday life.",
-      "zh": "这个保留对日常生活很重要。"
-    },
-    "predestine": {
-      "en": "People often predestine when they face a hard problem.",
-      "zh": "人们面对难题时常常会预先确定。"
-    },
-    "willful": {
-      "en": "Her answer sounded willful but still useful.",
-      "zh": "她的回答听起来故意的，但仍然有用。"
-    },
-    "armor": {
-      "en": "They talked about the armor for a long time.",
-      "zh": "他们就这个盔甲讨论了很久。"
-    },
-    "differentiation": {
-      "en": "This differentiation is important for everyday life.",
-      "zh": "这个区别对日常生活很重要。"
-    },
-    "cocaine": {
-      "en": "They talked about the cocaine for a long time.",
-      "zh": "他们就这个可卡因讨论了很久。"
-    },
-    "delusion": {
-      "en": "This delusion is important for everyday life.",
-      "zh": "这个欺骗对日常生活很重要。"
-    },
-    "chunk": {
-      "en": "This chunk is important for everyday life.",
-      "zh": "这个厚片对日常生活很重要。"
-    },
-    "maneuver": {
-      "en": "We need to maneuver before we make a final decision.",
-      "zh": "我们在做最终决定前需要设法变动位置。"
-    },
-    "overpass": {
-      "en": "A clear overpass can help students learn faster.",
-      "zh": "清楚的天桥能帮助学生学得更快。"
-    },
-    "rating": {
-      "en": "They talked about the rating for a long time.",
-      "zh": "他们就这个等级讨论了很久。"
+    "alternatively": {
+      "en": "You can walk there, or alternatively take the bus.",
+      "zh": "你可以走着去，或者改坐公交。"
     },
     "analogous": {
-      "en": "It was a analogous day for the whole family.",
-      "zh": "对全家来说，那是类似的的一天。"
+      "en": "Learning a language is analogous to learning to swim.",
+      "zh": "学习语言类似于学习游泳。"
+    },
+    "armor": {
+      "en": "The knight wore heavy armor before the battle.",
+      "zh": "骑士在战前穿上了沉重的盔甲。"
+    },
+    "assimilation": {
+      "en": "Cultural assimilation can take many years for new immigrants.",
+      "zh": "对新移民来说，文化同化可能需要许多年。"
+    },
+    "blond": {
+      "en": "The blond boy with blue eyes waved from the window.",
+      "zh": "那个金发碧眼的男孩在窗边招手。"
+    },
+    "boiler": {
+      "en": "The building's boiler broke down on the coldest night.",
+      "zh": "大楼的锅炉在最冷的夜晚坏了。"
+    },
+    "bridle": {
+      "en": "She held the horse's bridle firmly as it grew nervous.",
+      "zh": "马紧张时，她紧紧抓住马笼头。"
+    },
+    "brightness": {
+      "en": "The brightness of the screen hurt his eyes.",
+      "zh": "屏幕的亮度刺痛了他的眼睛。"
+    },
+    "buffalo": {
+      "en": "A large buffalo stood quietly near the river bank.",
+      "zh": "一头大水牛静静地站在河岸边。"
+    },
+    "burner": {
+      "en": "Turn the gas burner down before the soup boils over.",
+      "zh": "在汤溢出来之前把煤气灶火关小。"
+    },
+    "capacitance": {
+      "en": "The engineer measured the capacitance of the new circuit.",
+      "zh": "工程师测量了新电路的电容。"
+    },
+    "casualty": {
+      "en": "The accident caused one serious casualty and two minor injuries.",
+      "zh": "事故造成一人重伤、两人轻伤。"
+    },
+    "chronically": {
+      "en": "He has been chronically late for morning meetings.",
+      "zh": "他长期开会迟到。"
+    },
+    "chunk": {
+      "en": "She cut a thick chunk of bread for her sandwich.",
+      "zh": "她切了一大块面包做三明治。"
+    },
+    "cocaine": {
+      "en": "Police found illegal cocaine hidden in the truck.",
+      "zh": "警方在卡车里发现了藏匿的非法可卡因。"
+    },
+    "coffin": {
+      "en": "Friends carried the wooden coffin to the quiet cemetery.",
+      "zh": "朋友们抬着木棺走向安静的墓地。"
+    },
+    "conclusive": {
+      "en": "The DNA test provided conclusive proof of his innocence.",
+      "zh": "DNA检测提供了他无罪的确凿证据。"
+    },
+    "correlate": {
+      "en": "Smoking is a known correlate of many heart problems.",
+      "zh": "吸烟是许多心脏问题的已知相关因素。"
+    },
+    "counselor": {
+      "en": "She talked to a school counselor about her future plans.",
+      "zh": "她找学校咨询顾问讨论了未来规划。"
+    },
+    "crab": {
+      "en": "We caught a live crab and cooked it for dinner.",
+      "zh": "我们抓到一只活蟹，做成了晚餐。"
+    },
+    "datum": {
+      "en": "Each datum in the table must be checked carefully.",
+      "zh": "表格中的每一条数据都必须仔细核对。"
+    },
+    "degeneration": {
+      "en": "Lack of exercise can lead to muscle degeneration.",
+      "zh": "缺乏锻炼可能导致肌肉退化。"
+    },
+    "delusion": {
+      "en": "He lived under the delusion that he would never grow old.",
+      "zh": "他生活在自己永远不会变老的错觉中。"
+    },
+    "derail": {
+      "en": "Fallen trees can derail a train if they block the tracks.",
+      "zh": "倒下的树若挡住铁轨，可能使火车脱轨。"
+    },
+    "destine": {
+      "en": "Nothing can destine a person to failure forever.",
+      "zh": "没有什么能注定一个人永远失败。"
+    },
+    "deterioration": {
+      "en": "Doctors worried about the rapid deterioration of his health.",
+      "zh": "医生担心他的健康迅速恶化。"
+    },
+    "differentiation": {
+      "en": "Product differentiation helps companies stand out in the market.",
+      "zh": "产品差异化帮助公司在市场中脱颖而出。"
+    },
+    "disproportionately": {
+      "en": "Poor families are disproportionately affected by rising food prices.",
+      "zh": "食品涨价对贫困家庭的影响格外不成比例。"
+    },
+    "drastically": {
+      "en": "The company drastically cut costs to avoid bankruptcy.",
+      "zh": "公司大幅削减成本以避免破产。"
+    },
+    "dwarf": {
+      "en": "In the fairy tale, a kind dwarf helps the lost child.",
+      "zh": "童话里，一位善良的小矮人帮助了迷路的孩子。"
+    },
+    "dysfunction": {
+      "en": "Liver dysfunction can cause serious health problems.",
+      "zh": "肝功能失灵可能导致严重的健康问题。"
+    },
+    "energize": {
+      "en": "A short walk can energize you after a long meeting.",
+      "zh": "开完长会后散散步能让你恢复精力。"
+    },
+    "entrepreneurship": {
+      "en": "The university offers a course on entrepreneurship for students.",
+      "zh": "这所大学为学生开设了创业管理课程。"
     },
     "esthetic": {
-      "en": "It was a esthetic day for the whole family.",
-      "zh": "对全家来说，那是美学的的一天。"
+      "en": "The museum values the esthetic beauty of modern design.",
+      "zh": "博物馆重视现代设计的美学之美。"
+    },
+    "exceptional": {
+      "en": "She showed exceptional skill in solving hard math problems.",
+      "zh": "她在解决难题时表现出非凡的能力。"
+    },
+    "fearlessly": {
+      "en": "The firefighter fearlessly entered the burning building.",
+      "zh": "消防员无畏地冲进了着火的大楼。"
+    },
+    "fertility": {
+      "en": "Good soil fertility helps farmers grow stronger crops.",
+      "zh": "良好的土壤肥力帮助农民种出更壮的庄稼。"
+    },
+    "firmness": {
+      "en": "She spoke with firmness when she refused the unfair offer.",
+      "zh": "她拒绝不公平的提议时语气坚定。"
+    },
+    "flux": {
+      "en": "The city population is in constant flux as people move in and out.",
+      "zh": "随着人们迁入迁出，城市人口处于不断流动之中。"
+    },
+    "glider": {
+      "en": "The silent glider floated high above the green hills.",
+      "zh": "那架无声的滑翔机在青山之上飘过。"
+    },
+    "gorilla": {
+      "en": "A large gorilla sat quietly in the forest shade.",
+      "zh": "一只大猩猩安静地坐在森林阴凉处。"
+    },
+    "granite": {
+      "en": "The statue was carved from hard gray granite.",
+      "zh": "这座雕像由坚硬的灰色花岗岩雕刻而成。"
+    },
+    "graphite": {
+      "en": "Pencils use graphite to leave marks on paper.",
+      "zh": "铅笔用石墨在纸上留下痕迹。"
+    },
+    "hack": {
+      "en": "Criminals tried to hack into the company's computer system.",
+      "zh": "犯罪分子试图黑进公司的电脑系统。"
+    },
+    "handgun": {
+      "en": "Police found an illegal handgun in the abandoned car.",
+      "zh": "警方在废弃汽车里发现一把非法手枪。"
+    },
+    "herald": {
+      "en": "Dark clouds can herald the arrival of a storm.",
+      "zh": "乌云可能预示着暴风雨的到来。"
+    },
+    "hull": {
+      "en": "Workers repaired a hole in the ship's steel hull.",
+      "zh": "工人们修补了船体钢壳上的一个洞。"
+    },
+    "hurrah": {
+      "en": "Hurrah! Our team has finally won the match!",
+      "zh": "好哇！我们队终于赢了比赛！"
+    },
+    "ideologically": {
+      "en": "The two parties are ideologically far apart on this issue.",
+      "zh": "两党在这个问题上意识形态分歧很大。"
+    },
+    "immersive": {
+      "en": "The museum offers an immersive experience with virtual reality.",
+      "zh": "博物馆用虚拟现实提供身临其境的体验。"
+    },
+    "incur": {
+      "en": "Late payments will incur extra bank fees.",
+      "zh": "逾期付款会产生额外的银行费用。"
+    },
+    "intensely": {
+      "en": "She studied intensely for three weeks before the exam.",
+      "zh": "考试前她紧张地复习了三周。"
+    },
+    "ion": {
+      "en": "An ion is an atom that carries an electric charge.",
+      "zh": "离子是带有电荷的原子。"
+    },
+    "landmark": {
+      "en": "The court made a landmark decision on equal pay.",
+      "zh": "法院在同工同酬问题上作出了具有里程碑意义的裁决。"
+    },
+    "lathe": {
+      "en": "The worker shaped the metal part on a lathe.",
+      "zh": "工人在车床上加工出了这个金属零件。"
+    },
+    "lily": {
+      "en": "A white lily bloomed beside the garden pond.",
+      "zh": "一朵白百合在花园池塘边开放。"
+    },
+    "literacy": {
+      "en": "Adult literacy programs help people learn to read and write.",
+      "zh": "成人识字项目帮助人们学习读写。"
+    },
+    "lobbyist": {
+      "en": "The lobbyist tried to persuade lawmakers to support the bill.",
+      "zh": "游说者试图说服议员支持该法案。"
+    },
+    "maneuver": {
+      "en": "The driver had to maneuver the car into a tiny parking space.",
+      "zh": "司机不得不把车挪进一个很小的车位。"
+    },
+    "mast": {
+      "en": "A tall mast rose from the center of the sailing boat.",
+      "zh": "帆船中央竖立着一根高高的桅杆。"
+    },
+    "module": {
+      "en": "This software module handles user login and passwords.",
+      "zh": "这个软件模块负责用户登录和密码。"
+    },
+    "narration": {
+      "en": "The film's narration is spoken by a famous actor.",
+      "zh": "这部电影的旁白由一位著名演员讲述。"
+    },
+    "notoriously": {
+      "en": "The mountain road is notoriously dangerous in winter.",
+      "zh": "这条山路在冬天出了名的危险。"
+    },
+    "obscurity": {
+      "en": "The poet lived in obscurity until her books became popular.",
+      "zh": "这位诗人在作品走红之前一直默默无闻。"
+    },
+    "ohm": {
+      "en": "Resistance in this wire is about one ohm.",
+      "zh": "这根导线的电阻约为一欧姆。"
+    },
+    "overpass": {
+      "en": "Cars crossed the busy overpass above the railway lines.",
+      "zh": "汽车从铁路上方繁忙的立交桥上驶过。"
+    },
+    "oxide": {
+      "en": "Iron oxide is the red powder we usually call rust.",
+      "zh": "氧化铁就是我们通常所说的红色铁锈粉末。"
+    },
+    "panther": {
+      "en": "A black panther moved silently through the night forest.",
+      "zh": "一只黑豹无声地穿过夜色中的森林。"
+    },
+    "pantry": {
+      "en": "She kept flour and rice in a small pantry next to the kitchen.",
+      "zh": "她把面粉和大米放在厨房旁的小食品柜里。"
+    },
+    "predestine": {
+      "en": "Some people believe fate can predestine a person's future.",
+      "zh": "有些人相信命运能注定一个人的未来。"
+    },
+    "preindustrial": {
+      "en": "Life in preindustrial villages depended heavily on farming.",
+      "zh": "工业化以前的乡村生活严重依赖农业。"
+    },
+    "premium": {
+      "en": "Workers received a cash premium for finishing early.",
+      "zh": "工人因提前完工获得了现金奖金。"
+    },
+    "printer": {
+      "en": "The office printer ran out of paper before the meeting.",
+      "zh": "开会前办公室的打印机没纸了。"
+    },
+    "propagation": {
+      "en": "The rapid propagation of the rumor worried the company.",
+      "zh": "谣言的迅速传播让公司感到担忧。"
+    },
+    "proximately": {
+      "en": "The two events occurred proximately in time, only minutes apart.",
+      "zh": "这两件事在时间上很接近，只隔了几分钟。"
+    },
+    "pumpkin": {
+      "en": "Children carved a big orange pumpkin for Halloween.",
+      "zh": "孩子们为万圣节刻了一个大南瓜。"
+    },
+    "purify": {
+      "en": "Special filters help purify drinking water in the village.",
+      "zh": "特殊滤芯帮助净化村里的饮用水。"
+    },
+    "rating": {
+      "en": "The TV show received a high audience rating last night.",
+      "zh": "昨晚这个电视节目获得了很高的收视率。"
+    },
+    "recruiter": {
+      "en": "A company recruiter called her about a new job opening.",
+      "zh": "公司招聘人员就一个新职位给她打了电话。"
+    },
+    "reed": {
+      "en": "The musician played a soft tune on a thin reed.",
+      "zh": "乐手用细细的芦笛吹奏出柔和的曲调。"
+    },
+    "refrain": {
+      "en": "Please refrain from talking during the exam.",
+      "zh": "考试期间请不要讲话。"
+    },
+    "reimbursement": {
+      "en": "She received full reimbursement for her train tickets.",
+      "zh": "她的火车票费用得到了全额报销。"
+    },
+    "reptile": {
+      "en": "A snake is a cold-blooded reptile that lays eggs.",
+      "zh": "蛇是产卵的冷血爬行动物。"
+    },
+    "retention": {
+      "en": "Water retention in the soil helps plants survive dry weeks.",
+      "zh": "土壤保水有助于植物熬过干旱的几周。"
+    },
+    "rigor": {
+      "en": "Military training is known for its rigor and discipline.",
+      "zh": "军事训练以严格和纪律著称。"
+    },
+    "shepherd": {
+      "en": "Teachers shepherd new students through their first week.",
+      "zh": "老师引导新生度过入学第一周。"
+    },
+    "shrank": {
+      "en": "The wool sweater shrank after it was washed in hot water.",
+      "zh": "这件羊毛衫用热水洗后缩水了。"
+    },
+    "simultaneously": {
+      "en": "The two singers began simultaneously and finished together.",
+      "zh": "两位歌手同时开始，又一起结束。"
+    },
+    "sofa": {
+      "en": "They sat on the sofa and watched a film together.",
+      "zh": "他们坐在沙发上一同看电影。"
+    },
+    "stern": {
+      "en": "Waves hit the stern of the boat during the storm.",
+      "zh": "暴风雨中海浪拍打着船尾。"
+    },
+    "straightforward": {
+      "en": "Her answer was clear and straightforward.",
+      "zh": "她的回答清晰而直截了当。"
+    },
+    "successively": {
+      "en": "He won the race three years successively.",
+      "zh": "他连续三年赢得比赛。"
+    },
+    "tactics": {
+      "en": "The coach changed tactics at half-time.",
+      "zh": "教练在中场休息时改变了战术。"
+    },
+    "tape": {
+      "en": "Please tape the broken box before you ship it.",
+      "zh": "寄出前请用胶带把破箱子粘好。"
+    },
+    "torque": {
+      "en": "The engine produces enough torque to climb steep hills.",
+      "zh": "这台发动机产生的扭矩足以爬上陡坡。"
+    },
+    "tradeoff": {
+      "en": "There is always a tradeoff between speed and accuracy.",
+      "zh": "速度与准确性之间总存在权衡。"
+    },
+    "treasurer": {
+      "en": "The club treasurer keeps careful records of all spending.",
+      "zh": "俱乐部财务主管仔细记录所有开支。"
+    },
+    "turbulence": {
+      "en": "The plane shook hard during the sudden turbulence.",
+      "zh": "飞机在突如其来的气流中剧烈颠簸。"
+    },
+    "underrepresented": {
+      "en": "Women are still underrepresented in some science fields.",
+      "zh": "女性在某些科学领域的代表性仍然不足。"
+    },
+    "valuable": {
+      "en": "Please put each valuable in the hotel safe.",
+      "zh": "请把每件贵重物品放进酒店保险箱。"
+    },
+    "waitress": {
+      "en": "The waitress brought our drinks quickly and with a smile.",
+      "zh": "女服务员面带微笑很快端来了饮料。"
+    },
+    "willful": {
+      "en": "His willful refusal to listen caused more problems.",
+      "zh": "他故意不肯听，导致了更多问题。"
+    },
+    "wrestle": {
+      "en": "The two athletes began a tough wrestle on the mat.",
+      "zh": "两名运动员在垫子上开始了一场激烈的摔跤。"
     }
   }
 }
