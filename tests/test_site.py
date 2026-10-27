@@ -240,6 +240,10 @@ with sync_playwright() as p:
     vs = vocab(page)
     cet_new = [x for x in vs if x["source"] == "cet4"]
     check("10 new CET-4 words added", len(cet_new) == 10, ", ".join(x["word"] for x in cet_new))
+    first_letters = {x["word"][0].lower() for x in cet_new}
+    check("new CET words are mixed (not all same letter / not alpha-a dump)",
+          len(first_letters) >= 5 and not all(x["word"][0].lower() == "a" for x in cet_new),
+          ", ".join(x["word"] for x in cet_new))
     check("new words have phonetic + Chinese", all(x["zh"] for x in cet_new) and sum(1 for x in cet_new if x["phonetic"]) >= 8)
     check("new words scheduled after first test (stage 1, due tomorrow)", all(x["srs"]["stage"] == 1 and x["srs"]["due"] == "2026-10-24" for x in cet_new))
     e = word(page, "emission")
@@ -730,6 +734,45 @@ with sync_playwright() as p:
     A.click("#btnSyncOff")
     check("disconnect removes token, keeps data", A.evaluate("localStorage.getItem('er_sync_token')") is None and "offline word" in words(A) and A.locator("#syncSetup").is_visible())
     ca.close(); cb.close()
+
+    # ---------- 17. CET new-word order (hash-mixed, deterministic) ----------
+    oc = browser.new_context(); mock_routes(oc)
+    op = oc.new_page(); attach(op, "cet-order")
+    goto(op, "2026-10-23", "#/review"); op.wait_for_selector("#statNew")
+    batch1 = op.evaluate("""async()=>{
+      var a=await ER.pickNewCet(10); return a.map(x=>x.word);
+    }""")
+    batch1b = op.evaluate("""async()=>{
+      var a=await ER.pickNewCet(10); return a.map(x=>x.word);
+    }""")
+    check("CET pickNew is deterministic on reload", batch1 == batch1b, str(batch1))
+    check("CET pickNew first batch is mixed letters",
+          len({w[0].lower() for w in batch1}) >= 5 and batch1[0][0].lower() != "a",
+          ", ".join(batch1))
+    check("CET pickNew skips obscure / proper nouns",
+          all(len(w) >= 2 and " " not in w and w[0] == w[0].lower() for w in batch1),
+          ", ".join(batch1))
+    # mark first 5 as seen (as if already introduced); next batch must not repeat them
+    op.evaluate("""(ws)=>{
+      var s=ER.lsGet('er_cet_seen',{});
+      ws.forEach(w=>s[w.toLowerCase()]='learn');
+      ER.lsSet('er_cet_seen',s);
+    }""", batch1[:5])
+    batch2 = op.evaluate("""async()=>{
+      var a=await ER.pickNewCet(10); return a.map(x=>x.word);
+    }""")
+    check("CET pickNew skips already-seen words", not set(batch1[:5]) & set(batch2),
+          f"seen={batch1[:5]} next={batch2}")
+    check("CET next batch still mixed", len({w[0].lower() for w in batch2}) >= 4, ", ".join(batch2))
+    # second fresh device with empty seen gets the same first batch
+    oc2 = browser.new_context(); mock_routes(oc2)
+    op2 = oc2.new_page(); attach(op2, "cet-order-2")
+    goto(op2, "2026-10-23", "#/review"); op2.wait_for_selector("#statNew")
+    batch_other = op2.evaluate("""async()=>{
+      var a=await ER.pickNewCet(10); return a.map(x=>x.word);
+    }""")
+    check("CET order identical across fresh devices", batch_other == batch1, f"{batch1} vs {batch_other}")
+    oc.close(); oc2.close()
 
     # ---------- 16. glossary + translation fallbacks ----------
     gc = browser.new_context(accept_downloads=True, viewport={"width": 1100, "height": 900})

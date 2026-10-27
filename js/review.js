@@ -41,21 +41,57 @@ function loadLists(){
   var need=['cet4']; if(ER.settings.cet6) need.push('cet6');
   return Promise.all(need.map(function(l){ return ER.loadCet(l).then(function(x){cetLists[l]=x;}); }));
 }
-/* 挑选今天的新词：四级优先；勾选六级后四六级交替 */
+/* 挑选今天的新词：按「词 + 固定盐」的稳定哈希排序（非字母序，各设备一致）；四级优先，勾选六级后四六级交替 */
+var CET_ORDER_SALT = 'er-cet-order-v1';
+function cetHash(w){
+  var h = 2166136261 >>> 0, s = CET_ORDER_SALT + '\0' + String(w).toLowerCase();
+  for(var i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h;
+}
+function cetEligible(x){
+  var w = String(x && x.word || '');
+  if(w.length < 2) return false;                 // 单字母
+  if(/\s/.test(w)) return false;                 // 含空格
+  if(w.charAt(0) !== w.charAt(0).toLowerCase()) return false; // 专有名词 / 月份等
+  if(!/[a-z]/.test(w)) return false;             // 全大写缩写如 FALSE
+  return true;
+}
+function orderedPool(list, seenMap, used){
+  return (list||[]).filter(function(x){
+    if(!cetEligible(x)) return false;
+    var w=x.word.toLowerCase();
+    return !seenMap[w] && !used[w];
+  }).sort(function(a,b){
+    var ha=cetHash(a.word), hb=cetHash(b.word);
+    if(ha!==hb) return ha<hb ? -1 : 1;
+    var aw=a.word.toLowerCase(), bw=b.word.toLowerCase();
+    return aw<bw ? -1 : aw>bw ? 1 : 0;
+  });
+}
 function pickNew(n){
   if(n<=0) return [];
   var s=seen(), out=[], used={};
   ER.getVocab().forEach(function(v){used[v.word.toLowerCase()]=1;});
-  var iters=[{list:cetLists.cet4||[],i:0}]; if(ER.settings.cet6&&cetLists.cet6) iters.push({list:cetLists.cet6,i:0});
-  var k=0, guard=0;
+  var pools=[orderedPool(cetLists.cet4, s, used)];
+  if(ER.settings.cet6 && cetLists.cet6) pools.push(orderedPool(cetLists.cet6, s, used));
+  var idx=pools.map(function(){return 0;}), k=0, guard=0;
   while(out.length<n && guard<20000){
     guard++;
-    var it=iters[k%iters.length]; k++;
-    while(it.i<it.list.length){ var x=it.list[it.i++]; var w=x.word.toLowerCase(); if(!s[w]&&!used[w]){ used[w]=1; out.push(x); break; } }
-    if(iters.every(function(t){return t.i>=t.list.length;})) break;
+    var pi=k % pools.length; k++;
+    var pool=pools[pi];
+    while(idx[pi]<pool.length){
+      var x=pool[idx[pi]++];
+      var w=x.word.toLowerCase();
+      if(used[w]||s[w]) continue;
+      used[w]=1; out.push(x); break;
+    }
+    if(pools.every(function(p,i){ return idx[i]>=p.length; })) break;
   }
   return out;
 }
+ER.cetHash = cetHash;
+ER.cetEligible = cetEligible;
+ER.pickNewCet = function(n){ return loadLists().then(function(){ return pickNew(n); }); };
 function counts(){
   var v=ER.getVocab(), t=today();
   var due=v.filter(function(x){return SRS.isDue(x.srs,t);}).length;
