@@ -12,6 +12,8 @@
 | 📒 **生词本** | 搜索、排序、按类型 / 来源筛选（单词、短语、阅读收藏、手动添加、四六级）、遮住中文、显示复习阶段和下次复习日期；**✍️ 手动添加**单词 / 短语 / 短句（中文可自己填，也可一键自动翻译，可加备注 / 例句）；每条都能点 ✏️ **修改中文意思**；导出 CSV（含类型、备注列）；**导出 / 导入 JSON 备份**（合并或覆盖），用于手机 ⇄ 电脑迁移。 |
 | ✏️ **自己粘贴** | 粘贴任意英文文章进入阅读模式（保留原来的功能和两篇示例）。 |
 
+**整段译文**：文章带有 `paragraphs_zh` 时，每段末尾有一个小小的「译」按钮，点一下在该段下方显示 / 隐藏中文译文；文章顶部的「全文对照」一次显示 / 隐藏全部译文，并记住你的选择（下次打开文章默认同样显示或隐藏）。译文是逐段人工智能精译后写进文章 JSON 的，不依赖在线翻译接口，国内也能直接显示。
+
 所有阅读模式中：电脑**双击**、手机**轻点**单词 → 弹出音标、中文释义、英文释义、例句、发音，可一键加入生词本（加入后当天就会出现在复习里）。
 
 ### 短语 / 短句
@@ -67,6 +69,7 @@ python3 -m http.server 8000
   "level": "B1–B2 · 雅思 5.5–6.5",
   "summary_zh": "中文导读",
   "paragraphs": ["段落 1", "段落 2"],     // 非空字符串数组
+  "paragraphs_zh": ["第 1 段的中文译文", "第 2 段的中文译文"],  // 可选：逐段中文译文，与 paragraphs 一一对应
   "key_words": [                         // 可为空数组
     {"word": "emission", "phonetic": "/iˈmɪʃn/", "meaning_zh": "n. 排放；排放物"}
   ],
@@ -77,6 +80,8 @@ python3 -m http.server 8000
 ```
 
 所有字符串字段必填且非空（`key_words[].phonetic` 可以是空字符串）。`phrases` 可省略；如果有，每项的 `text`（原文里的英文短语）和 `meaning_zh`（含中文）都必须非空，不能重复。读者拖选短语时会先查本文的 `phrases` 和 `key_words`（忽略大小写和标点，包含 / 被包含也会提示），查不到才在线翻译。
+
+`paragraphs_zh` 可省略（校验时会给出 warning）；如果有，必须是与 `paragraphs` **长度相同**的非空字符串数组，每项含中文，是对应英文段落的完整、准确、通顺的译文（注意代词指代、省略的主语、「one in three」「twice as likely as」这类比例表达和中文语序）。有译文时，阅读页每段末尾出现「译」按钮（显示 / 隐藏本段译文），文章顶部有「全文对照」开关（一次显示 / 隐藏全部译文，选择记在 localStorage 的 `er_para_zh`）；没有 `paragraphs_zh` 的文章不显示这些按钮。译文不参与查词：双击 / 拖选只对英文生效。
 
 `articles/index.json`：`[{"date": "2026-10-23", "title": "…", "file": "2026-10-23.json"}, …]`，按日期**从新到旧**排列，日期不重复。
 
@@ -92,7 +97,7 @@ python3 scripts/add_article.py --check                   # 校验 index.json 中
 
 ## 数据与备份
 
-localStorage 键：`er_vocab`（生词 / 短语，每条有 `word`、`type`（`"word"` 或 `"phrase"`）、`zh`、`sentence`、可选 `note`、`source`（`reading` / `manual` / `cet4` / `cet6`）以及 `srs` 进度：`stage`、`due`、`reps`、`lapses`、`last`、`qn`）、`er_cet_seen`（已学/已标记认识的四六级词）、`er_daily`（今日已学新词数）、`er_settings`、`er_cache`（查词缓存）。
+localStorage 键：`er_vocab`（生词 / 短语，每条有 `word`、`type`（`"word"` 或 `"phrase"`）、`zh`、`sentence`、可选 `note`、`source`（`reading` / `manual` / `cet4` / `cet6`）以及 `srs` 进度：`stage`、`due`、`reps`、`lapses`、`last`、`qn`）、`er_cet_seen`（已学/已标记认识的四六级词）、`er_daily`（今日已学新词数）、`er_settings`、`er_cache`（查词缓存）、`er_para_zh`（「全文对照」开关，true / false）。
 「导出备份」生成 `{"app":"english-reader","version":2,"data":{vocab, cetSeen, daily, settings}}`。
 「导入（合并）」：两边都有的词保留最近复习过的那份进度；「导入（覆盖本地）」：完全用备份替换。
 

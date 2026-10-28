@@ -291,15 +291,20 @@ function showArticle(date){
   });
 }
 function renderArticle(a, isNewest){
-  var h='<div class="card">';
-  h+='<div class="art-meta"><span class="tag">'+(isNewest?'今日阅读':'往期')+' · '+esc(a.date)+'</span><span class="tag">'+esc(a.level||'')+'</span><span>'+wordCount(a)+' 词</span></div>';
+  var h='<div class="card">', zh=paraZh(a), shown=zhState(a);
+  h+='<div class="art-meta"><span class="tag">'+(isNewest?'今日阅读':'往期')+' · '+esc(a.date)+'</span><span class="tag">'+esc(a.level||'')+'</span><span>'+wordCount(a)+' 词</span>'+
+     (zh?'<button type="button" id="btnZhAll" class="zh-all" aria-pressed="false" title="显示 / 隐藏全部段落的中文译文（也可以点每段末尾的「译」只看一段）">全文对照</button>':'')+'</div>';
   h+='<article class="reader" id="articleReader"><h2>'+tokenize(a.title)+'</h2>';
   h+='<div class="art-title-zh">'+esc(a.title_zh||'')+'</div>';
   h+='<details class="summary"><summary>中文导读（建议读完英文后再看）</summary><div style="margin-top:6px;font-family:-apple-system,\'PingFang SC\',sans-serif;font-size:15px;line-height:1.7">'+esc(a.summary_zh||'')+'</div></details>';
-  (a.paragraphs||[]).forEach(function(p){ h+='<p>'+tokenize(p)+'</p>'; });
+  (a.paragraphs||[]).forEach(function(p,i){
+    if(!zh){ h+='<p>'+tokenize(p)+'</p>'; return; }
+    h+='<p data-pi="'+i+'">'+tokenize(p)+'<button type="button" class="zh-btn" data-zh="'+i+'" aria-controls="pzh'+i+'" aria-expanded="'+(shown[i]?'true':'false')+'" title="显示 / 隐藏本段中文译文">译</button></p>'+
+       '<div class="para-zh" id="pzh'+i+'" lang="zh-CN"'+(shown[i]?'':' hidden')+'>'+esc(zh[i])+'</div>';
+  });
   h+='</article>';
   h+='<p class="hint">来源：<a href="'+esc(a.source_url)+'" target="_blank" rel="noopener">'+esc(a.source_name||a.source_url)+'</a>（本文为根据该报道改写的原创学习文章）</p>';
-  h+='<p class="hint">'+READ_HINT+'</p></div>';
+  h+='<p class="hint">'+READ_HINT+(zh?' · 点段末「译」或上方「全文对照」看整段中文译文（AI 逐段精译，建议先自己读懂再对照）':'')+'</p></div>';
   if(a.key_words&&a.key_words.length){
     h+='<div class="card"><h3 class="card-title">🔑 重点词汇</h3><div class="kw-list">';
     a.key_words.forEach(function(k){
@@ -311,8 +316,39 @@ function renderArticle(a, isNewest){
     h+='</div><div class="row"><button id="btnAddAllKw">全部加入生词本</button></div></div>';
   }
   $('articleBox').innerHTML=h;
+  syncZhAll();
   refreshHighlights();
 }
+/* ========== 整段中文译文（paragraphs_zh，可选） ========== */
+var ZH_KEY='er_para_zh';   // 记住「全文对照」开关：true = 默认显示全部译文
+var zhMem={date:null,shown:[]};
+function paraZh(a){
+  var z=a&&a.paragraphs_zh, p=(a&&a.paragraphs)||[];
+  if(!Array.isArray(z)||z.length!==p.length||!p.length) return null;
+  for(var i=0;i<z.length;i++){ if(typeof z[i]!=='string'||!z[i].trim()) return null; }
+  return z;
+}
+function zhState(a){
+  var n=((a&&a.paragraphs)||[]).length;
+  if(zhMem.date!==(a&&a.date)||zhMem.shown.length!==n){
+    var all=!!lsGet(ZH_KEY,false);
+    zhMem={date:a&&a.date,shown:Array.from({length:n},function(){return all;})};
+  }
+  return zhMem.shown;
+}
+function setParaZh(i,on){
+  zhMem.shown[i]=on;
+  var d=$('pzh'+i); if(d) d.hidden=!on;
+  var b=document.querySelector('#articleReader .zh-btn[data-zh="'+i+'"]');
+  if(b){ b.setAttribute('aria-expanded',on?'true':'false'); }
+}
+function syncZhAll(){
+  var b=$('btnZhAll'); if(!b) return;
+  var all=zhMem.shown.length&&zhMem.shown.every(Boolean);
+  b.setAttribute('aria-pressed',all?'true':'false');
+  b.textContent=all?'✓ 全文对照':'全文对照';
+}
+ER.paraZhPref=function(){ return !!lsGet(ZH_KEY,false); };
 function wordCount(a){return (a.paragraphs||[]).join(' ').split(/\s+/).filter(function(x){return /[A-Za-z]/.test(x);}).length;}
 function sentenceFor(word, root){
   var forms=candidates(word); var sp=root.querySelectorAll('.w');
@@ -328,7 +364,15 @@ function addKeyWord(k){
 $('articleBox').addEventListener('click',function(e){
   var b=e.target.closest('button'); if(!b||!currentArticle) return;
   var kws=currentArticle.key_words||[];
-  if(b.dataset.kwsay){ speak(b.dataset.kwsay); }
+  if(b.dataset.zh!=null){
+    e.preventDefault();
+    var i=+b.dataset.zh; setParaZh(i,!zhMem.shown[i]); syncZhAll();
+  } else if(b.id==='btnZhAll'){
+    e.preventDefault();
+    var on=!zhMem.shown.every(Boolean);
+    for(var k=0;k<zhMem.shown.length;k++) setParaZh(k,on);
+    lsSet(ZH_KEY,on,true); syncZhAll();
+  } else if(b.dataset.kwsay){ speak(b.dataset.kwsay); }
   else if(b.dataset.kwadd){
     var k=kws.find(function(x){return x.word===b.dataset.kwadd;});
     if(inVocab(k.word)){ toast('「'+k.word+'」已在生词本'); return; }
@@ -981,6 +1025,15 @@ function snapRange(r0){
   if(ew){ if(r.endContainer.nodeType===3&&r.endOffset===0&&sw!==ew) r.setEndBefore(ew); else r.setEndAfter(ew); }
   return r;
 }
+var ZH_SKIP='.para-zh,.zh-btn';
+function inZh(n){ var e=n&&(n.nodeType===1?n:n.parentElement); return !!(e&&e.closest&&e.closest(ZH_SKIP)); }
+/* 选区文字（跳过跨段选择时夹在中间的中文译文和「译」按钮） */
+function rangeText(r){
+  var anc=r.commonAncestorContainer; anc=anc.nodeType===1?anc:anc.parentElement;
+  if(!anc||!anc.querySelector||!anc.querySelector(ZH_SKIP)) return r.toString();
+  var f=r.cloneContents(); Array.prototype.forEach.call(f.querySelectorAll(ZH_SKIP),function(x){ x.parentNode.replaceChild(document.createTextNode(' '),x); });
+  return f.textContent;
+}
 function cleanSel(t){ return String(t||'').replace(/\s+/g,' ').replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu,'').trim(); }
 function sentencesFor(r, reader){
   var out=[], ss=reader.querySelectorAll('.sent');
@@ -1058,7 +1111,8 @@ function checkSelection(){
   if(!sel||!sel.rangeCount||sel.isCollapsed){ lastSelKey=''; return; }
   var r0=sel.getRangeAt(0), reader=readerOf(r0.startContainer);
   if(!reader||reader!==readerOf(r0.endContainer)) return;
-  var r=snapRange(r0), text=cleanSel(r.toString()), words=text.match(WORD_RE)||[];
+  if(inZh(r0.startContainer)||inZh(r0.endContainer)) return;   // 选中的是中文译文 / 按钮：不查词
+  var r=snapRange(r0), text=cleanSel(rangeText(r)), words=text.match(WORD_RE)||[];
   if(!words.length) return;
   var key=(words.length>1?'p:':'w:')+text;
   if(key===lastSelKey && pop.classList.contains('show')) return;

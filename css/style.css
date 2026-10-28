@@ -212,3 +212,18 @@ body.sheet-open main{padding-bottom:55vh}
   .gaps{font-size:22px;gap:3px}
   .gap-in{width:1.5em;height:2em;font-size:20px}
 }
+
+/* 整段中文译文（paragraphs_zh） */
+.art-meta .zh-all{margin-left:auto;font-size:13px;line-height:1.2;padding:2px 12px;border-radius:14px;color:var(--brand-d);border-color:#c9d8f5;background:#f6f9ff;white-space:nowrap;-webkit-user-select:none;user-select:none;position:relative}
+.art-meta .zh-all[aria-pressed="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
+@media (pointer:coarse){ .art-meta .zh-all{font-size:14px;padding:6px 14px;min-height:36px;border-radius:18px} }
+.reader .zh-btn{display:inline-flex;align-items:center;justify-content:center;vertical-align:.1em;margin:0 0 0 6px;padding:0 8px;min-width:32px;height:26px;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;font-size:13px;line-height:1;border-radius:13px;color:var(--brand-d);border:1px solid #c9d8f5;background:#f6f9ff;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;position:relative}
+.reader .zh-btn:hover{border-color:var(--brand)}
+.reader .zh-btn[aria-expanded="true"]{background:var(--brand);border-color:var(--brand);color:#fff}
+/* 触屏：按钮看起来不大，但可点区域 ≥ 44×44 */
+.reader .zh-btn::after{content:"";position:absolute;left:-4px;right:-6px;top:-4px;bottom:-4px}
+@media (pointer:coarse){
+  .reader .zh-btn{height:30px;min-width:38px;font-size:14px;border-radius:15px}
+  .reader .zh-btn::after{left:-7px;right:-10px;top:-7px;bottom:-7px}
+}
+.para-zh{margin:-.45em 0 1.1em;padding:8px 12px;border-left:3px solid #9fbdf0;background:#f6f9ff;border-radius:0 8px 8px 0;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:max(15px,.8em);line-height:1.75;color:#33415c;overflow-wrap:anywhere}

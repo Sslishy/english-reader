@@ -930,6 +930,109 @@ with sync_playwright() as p:
           gp2.inner_text("#pop")[:220].replace("\n"," | "))
     gc2.close()
 
+    # ---------- 19. whole-paragraph Chinese translations (paragraphs_zh) ----------
+    CJK = re.compile(r"[\u4e00-\u9fff]")
+    all_ok, bad = True, []
+    for e_ in idx:
+        a_ = json.load(open(os.path.join(ROOT, "articles", e_["file"]), encoding="utf-8"))
+        z_ = a_.get("paragraphs_zh")
+        if not (isinstance(z_, list) and len(z_) == len(a_["paragraphs"]) and all(isinstance(x, str) and CJK.search(x) for x in z_)):
+            all_ok = False; bad.append(e_["date"])
+    check("every article has paragraphs_zh matching paragraphs", all_ok, ", ".join(bad))
+    a28 = json.load(open(os.path.join(ROOT, "articles/2026-10-28.json"), encoding="utf-8"))
+    ONE_IN_THREE = "即使在这一比例最低的欧洲和中亚地区，也有超过三分之一的家政工是以非正式方式领取报酬的。"
+    check("2026-10-28 'one in three' sentence translated correctly", ONE_IN_THREE in a28["paragraphs_zh"][2] and "工资率" not in a28["paragraphs_zh"][2])
+    n28 = len(a28["paragraphs"])
+
+    tc = browser.new_context(viewport={"width": 1100, "height": 900})
+    mock_routes(tc)
+    def strip_zh(route, mode):
+        resp = route.fetch(); a_ = resp.json()
+        if mode == "none": a_.pop("paragraphs_zh", None)
+        else: a_["paragraphs_zh"] = a_["paragraphs_zh"][:-1]
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(a_, ensure_ascii=False))
+    tc.route(re.compile(r".*/articles/2026-10-24\.json.*"), lambda r: strip_zh(r, "none"))
+    tc.route(re.compile(r".*/articles/2026-10-25\.json.*"), lambda r: strip_zh(r, "short"))
+    tp = tc.new_page(); attach(tp, "para-zh")
+    goto(tp, "2026-10-28", "#/read/2026-10-28"); tp.wait_for_selector("#articleReader h2")
+    vis = lambda pg: pg.evaluate("Array.from(document.querySelectorAll('#articleReader .para-zh')).map(d=>!d.hidden && d.offsetHeight>0)")
+    check("para-zh: one 译 button per paragraph + 全文对照 at top", tp.locator("#articleReader .zh-btn").count() == n28 and tp.locator(".art-meta #btnZhAll").is_visible())
+    check("para-zh: translations hidden by default", vis(tp) == [False] * n28, str(vis(tp)))
+    tp.click('#articleReader .zh-btn[data-zh="2"]')
+    check("para-zh: 译 shows only that paragraph", vis(tp) == [i == 2 for i in range(n28)] and ONE_IN_THREE in tp.inner_text("#pzh2")
+          and tp.get_attribute('.zh-btn[data-zh="2"]', "aria-expanded") == "true", str(vis(tp)))
+    check("para-zh: translation sits right under its paragraph",
+          tp.evaluate("document.querySelector('#articleReader p[data-pi=\"2\"]').nextElementSibling.id") == "pzh2")
+    check("para-zh: toggling opens no popup and adds no vocab", tp.locator("#pop.show").count() == 0 and vocab(tp) == [])
+    tp.click('#articleReader .zh-btn[data-zh="2"]')
+    check("para-zh: 译 again hides it", vis(tp) == [False] * n28)
+    check("para-zh: per-paragraph toggles not persisted", tp.evaluate("localStorage.getItem('er_para_zh')") is None)
+    tp.click("#btnZhAll")
+    check("para-zh: 全文对照 shows all", vis(tp) == [True] * n28 and tp.get_attribute("#btnZhAll", "aria-pressed") == "true")
+    check("para-zh: preference stored in er_para_zh (not er_vocab)",
+          tp.evaluate("localStorage.getItem('er_para_zh')") == "true" and tp.evaluate("localStorage.getItem('er_vocab')") in (None, "[]"))
+    # word lookup + phrase selection still work with translations visible
+    tp.locator('#articleReader .w[data-w="informally"]').last.dblclick()
+    tp.wait_for_function("document.querySelector('#pop.show') && !document.querySelector('#pop .spinner')")
+    check("para-zh: double-click lookup still works", tp.locator("#pop.show").count() == 1 and tp.locator("#pop.phrase").count() == 0
+          and tp.evaluate("document.querySelector('#articleReader .w.active').dataset.w") == "informally")
+    tp.mouse.click(5, 880); tp.wait_for_timeout(100)
+    drag_select(tp, '#articleReader p[data-pi="0"] .w >> nth=-1', '#articleReader p[data-pi="1"] .w >> nth=1')
+    wait_phrase_pop(tp)
+    pt = tp.inner_text("#phraseText")
+    check("para-zh: drag across paragraphs skips Chinese + 译 button", pt == "protection. The report" and not CJK.search(pt), pt)
+    tp.click("#pop .pop-close"); tp.evaluate("getSelection().removeAllRanges()"); tp.wait_for_timeout(100)
+    # selecting inside the Chinese text must not trigger lookup
+    tp.evaluate("""()=>{var d=document.getElementById('pzh0'), r=document.createRange(); r.selectNodeContents(d);
+      var s=getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new Event('selectionchange'));}""")
+    tp.wait_for_timeout(900)
+    check("para-zh: selecting the Chinese text opens no popup", tp.locator("#pop.show").count() == 0)
+    tp.evaluate("getSelection().removeAllRanges()")
+    # re-render after 全部加入生词本 keeps translations; reload / other article follow the stored preference
+    tp.click("#btnAddAllKw")
+    check("para-zh: state survives article re-render", vis(tp) == [True] * n28 and len(vocab(tp)) == len(a28["key_words"]))
+    tp.reload(); tp.wait_for_selector("#articleReader .para-zh")
+    check("para-zh: 全文对照 remembered after reload", vis(tp) == [True] * n28)
+    goto(tp, "2026-10-28", "#/read/2026-10-27"); tp.wait_for_selector("#pzh0")
+    check("para-zh: preference applies to other articles", all(vis(tp)) and len(vis(tp)) == 6)
+    tp.click('#articleReader .zh-btn[data-zh="0"]')
+    check("para-zh: hiding one paragraph un-presses 全文对照", tp.get_attribute("#btnZhAll", "aria-pressed") == "false" and vis(tp)[0] is False)
+    tp.click("#btnZhAll")
+    check("para-zh: 全文对照 with some hidden shows all", all(vis(tp)) and tp.evaluate("localStorage.getItem('er_para_zh')") == "true")
+    tp.click("#btnZhAll")
+    check("para-zh: 全文对照 off hides all + stored false", not any(vis(tp)) and tp.evaluate("localStorage.getItem('er_para_zh')") == "false")
+    goto(tp, "2026-10-28", "#/read/2026-10-24"); tp.wait_for_selector("#articleReader h2")
+    check("para-zh: article without paragraphs_zh shows no buttons", tp.locator(".zh-btn, #btnZhAll, .para-zh").count() == 0)
+    goto(tp, "2026-10-28", "#/read/2026-10-25"); tp.wait_for_selector("#articleReader h2")
+    check("para-zh: length mismatch -> buttons hidden", tp.locator(".zh-btn, #btnZhAll, .para-zh").count() == 0)
+    goto(tp, "2026-10-28", "#/paste"); tp.fill("#src", "Plain pasted text here."); tp.click("#btnRead"); tp.wait_for_selector("#pasteReader .w")
+    check("para-zh: paste reader unaffected", tp.locator("#pasteReader .zh-btn").count() == 0)
+    tc.close()
+
+    # mobile (iPhone-sized, touch)
+    tm = browser.new_context(viewport={"width": 390, "height": 760}, has_touch=True, is_mobile=True, device_scale_factor=3)
+    mock_routes(tm)
+    tq = tm.new_page(); attach(tq, "para-zh-mobile")
+    tq.goto(f"{BASE}?today=2026-10-28#/read/2026-10-28"); tq.wait_for_selector("#articleReader .zh-btn")
+    btn = tq.locator('#articleReader .zh-btn[data-zh="2"]'); btn.scroll_into_view_if_needed()
+    bb = btn.bounding_box()
+    hit = tq.evaluate("""()=>{var b=document.querySelector('#articleReader .zh-btn[data-zh="2"]').getBoundingClientRect(), c=0, n=0;
+      for(var dx=-4;dx<=b.width+4;dx+=4) for(var dy=-5;dy<=b.height+5;dy+=5){ n++; var e=document.elementFromPoint(b.left+dx,b.top+dy); if(e&&e.closest&&e.closest('.zh-btn[data-zh="2"]')) c++; }
+      return c/n;}""")
+    check("mobile para-zh: 译 button is a comfortable touch target", bb["height"] >= 28 and bb["width"] >= 36 and hit == 1, f"{bb} hit={hit:.2f}")
+    btn.tap()
+    check("mobile para-zh: tap 译 shows translation", vis(tq)[2] is True and tq.locator("#pop.show").count() == 0)
+    tq.tap("#btnZhAll")
+    check("mobile para-zh: 全文对照 tap shows all", all(vis(tq)))
+    check("mobile para-zh: no horizontal overflow", tq.evaluate("document.documentElement.scrollWidth<=window.innerWidth+1"))
+    tq.locator('#articleReader .w[data-w="informally"]').last.tap()
+    tq.wait_for_function("document.querySelector('#pop.show') && !document.querySelector('#pop .spinner')")
+    check("mobile para-zh: tap word still opens lookup sheet", tq.evaluate("document.getElementById('pop').classList.contains('sheet')")
+          and tq.evaluate("document.querySelector('#articleReader .w.active').dataset.w") == "informally")
+    tq.evaluate("ER.hidePop()")
+    tq.locator("#pzh2").scroll_into_view_if_needed(); tq.screenshot(path="/tmp/er_mobile_para_zh.png")
+    tm.close()
+
     # ---------- 14. live lookup (optional, real network) ----------
     if LIVE:
         lc = browser.new_context(); lp = lc.new_page(); attach(lp, "live")

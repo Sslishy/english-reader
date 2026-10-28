@@ -13,6 +13,13 @@
     "Google has also released open models, including MedSigLIP and MedGemma, so that governments can build their own tools. Indonesia's Ministry of Health is reportedly adapting these models using local X-ray data, with the ambitious goal of screening 50 million people a year. Because the models can run on local computers, sensitive patient data does not have to leave the country.",
     "Experts note that most of these figures come from Google and its partners, and independent results are still limited. Even so, the project shows how technology could help health systems reach people who were previously overlooked. If diagnosis becomes faster and cheaper, a disease that has troubled humanity for thousands of years may finally become easier to control."
   ],
+  "paragraphs_zh": [
+    "结核病（通常简称TB）是人类已知最古老的疾病之一，但至今仍是最致命的疾病之一。据谷歌研究院（Google Research）称，结核病每年估计造成123万人死亡。主要问题并不是缺少药物，而是许多感染者从来没有得到诊断，在医生和医疗设备短缺的较贫困社区尤其如此。",
+    "发现结核病最常用的方法之一，是给病人拍胸部X光片。然而，解读这些影像需要受过专门训练的专科医生，在有些地方，病人可能要等上好几周才能拿到结果。正是在这里，人工智能可以发挥重大作用。10月23日，谷歌研究院介绍了它的胸部X光软件是如何从实验室走进真正的诊所的。",
+    "谷歌与总部位于南非比勒陀利亚的医疗科技公司Nexus AI合作，后者把谷歌的算法变成了一款经过认证的诊断工具。这款工具最快只需45秒就能完成一张胸部X光片的筛查。目前，南非、塞拉利昂、科特迪瓦等国约40家医疗机构正在使用它，已有90多名临床医生用它评估了超过2.5万张影像。重要的是，人工智能并不会取代医生：它会把需要进一步检查的病人标出来，而最终决定仍由医务人员作出。在一个引人注目的案例中，人们利用便携式X光机和离线运行的人工智能，在南非一座金矿里为位于地下近4公里深处的矿工进行了筛查。",
+    "谷歌还发布了MedSigLIP、MedGemma等开放模型，让各国政府可以开发自己的工具。据报道，印度尼西亚卫生部正在用本国的X光数据对这些模型进行改造，目标十分宏大：每年筛查5000万人。由于这些模型可以在本地计算机上运行，敏感的病人数据不必离开本国。",
+    "专家指出，这些数据大多来自谷歌及其合作伙伴，独立的研究结果仍然有限。尽管如此，这个项目表明，技术可以帮助医疗系统惠及过去被忽视的人群。如果诊断变得更快、更便宜，这种困扰了人类数千年的疾病也许终于会变得更容易控制。"
+  ],
   "key_words": [
     {
       "word": "tuberculosis",

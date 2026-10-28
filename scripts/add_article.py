@@ -50,6 +50,19 @@ def validate(a):
         errs.append("paragraphs must be a non-empty list of strings")
     elif not all(isinstance(x, str) and x.strip() for x in p):
         errs.append("every paragraph must be a non-empty string")
+    pz = a.get("paragraphs_zh")
+    if pz is None:
+        if isinstance(p, list) and p:
+            print("warning: no paragraphs_zh (whole-paragraph Chinese translation); the reader will hide the 译 / 全文对照 buttons", file=sys.stderr)
+    elif not isinstance(pz, list):
+        errs.append("paragraphs_zh must be a list of strings (optional field)")
+    else:
+        if not all(isinstance(x, str) and x.strip() for x in pz):
+            errs.append("every paragraphs_zh item must be a non-empty string")
+        elif not all(re.search(r"[\u4e00-\u9fff]", x) for x in pz):
+            errs.append("every paragraphs_zh item must contain Chinese")
+        if isinstance(p, list) and len(pz) != len(p):
+            errs.append(f"paragraphs_zh has {len(pz)} item(s) but paragraphs has {len(p)}; they must match one-to-one")
     kw = a.get("key_words")
     if not isinstance(kw, list):
         errs.append("key_words must be a list")
@@ -84,7 +97,7 @@ def validate(a):
                 z = x.get("meaning_zh")
                 if isinstance(z, str) and z.strip() and not re.search(r"[\u4e00-\u9fff]", z):
                     errs.append(f"phrases[{i}].meaning_zh must contain Chinese")
-    extra = set(a) - set(STR_FIELDS) - {"paragraphs", "key_words", "phrases"}
+    extra = set(a) - set(STR_FIELDS) - {"paragraphs", "paragraphs_zh", "key_words", "phrases"}
     if extra:
         print("warning: unknown fields kept as-is:", ", ".join(sorted(extra)), file=sys.stderr)
     return errs
