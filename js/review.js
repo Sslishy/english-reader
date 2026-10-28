@@ -123,7 +123,7 @@ function renderHome(msg){
   h+='<div class="row">'+(nothing?'<span class="feedback ok">🎉 今天的复习任务完成了！</span><button id="btnMoreNew">再学 10 个新词</button>':'<button class="primary big" id="btnStart">开始复习 →</button>')+'</div>';
   h+='<div class="row"><label class="opt"><input type="checkbox" id="optCet6"'+(ER.settings.cet6?' checked':'')+'> 新词包含六级（CET-6）</label>'+
      '<label class="opt">每天新词 <select id="optNewPer">'+[0,5,10,15,20,30].map(function(n){return '<option value="'+n+'"'+(+ER.settings.newPerDay===n?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label></div>';
-  h+='<p class="hint">复习间隔（艾宾浩斯遗忘曲线）：答对后 1 → 2 → 4 → 7 → 15 → 30 天再复习，连续答对 6 次即「已掌握」（之后每 60 天抽查一次）；答错则回到第 0 阶段，明天重来，并在本轮稍后再考一次。题型（拼写 / 英译汉 / 汉译英 / 句子填空 / 补全字母）每个词轮换；短语 / 短句同样参与复习：拼写题变成听写（不计大小写和标点），超过 6 个词的改为「连词成句」。句子填空会挖去语境句中的目标词；补全字母保留首字母，按阶段隐藏其余字母。</p></div>';
+  h+='<p class="hint">复习间隔（艾宾浩斯遗忘曲线）：答对后 1 → 2 → 4 → 7 → 15 → 30 天再复习，连续答对 6 次即「已掌握」（之后每 60 天抽查一次）；答错则回到第 0 阶段，明天重来，并在本轮稍后再考一次。题型（拼写 / 英译汉 / 汉译英 / 句子填空 / 补全字母）每个词轮换；短语 / 短句同样参与复习：拼写题变成听写（不计大小写和标点），超过 6 个词的改为「连词成句」。句子填空会挖去语境句中的目标词；补全字母只在格子里填缺失的字母（保留首字母，按阶段隐藏其余字母），和整词拼写是两种不同的题。答错后「再练一次」沿用同一题型。</p></div>';
   h+='<div class="card"><h3 class="card-title">📅 未来 14 天复习量</h3>'+calendarHtml()+'</div>';
   box.innerHTML=h;
   var st=$('btnStart'); if(st) st.onclick=function(){ startSession(false); };
@@ -351,8 +351,12 @@ function distractors(target, field, n){
 /* 测试题 */
 function pickType(v, it){
   var ph=isPhrase(v), toks=tokens(v.word);
+  // 「再练一次」沿用第一次的题型（同一种题再练，不会从补全字母变成拼写）
+  if(it && it.keepType && TYPE_NAME[it.keepType]) return it.keepType;
   var type=SRS.qtype(v.word, v.srs);
   if(type==='spell' && ph && toks.length>ORDER_OVER) type='order';
+  // 补全字母需要至少一个可隐藏的字母（如单个字母的词），否则改为拼写
+  if(type==='gaps' && !gapMask(v.word, v.srs.stage, today()).gaps.length) type= ph && toks.length>ORDER_OVER ? 'order' : 'spell';
   // 句子填空需要例句；没有则轮到下一题型
   if(type==='cloze'){
     var sent=resolveSentence(v);
@@ -397,16 +401,18 @@ function renderTest(it){
     var mask=gapMask(v.word, v.srs.stage, today());
     it.answer=v.word; it.gaps=mask.gaps;
     h+='<div class="qzh" id="qPrompt">'+esc(zh)+'</div>'+
-       '<div class="hint">补全缺失的字母（首字母已给出；也可在下方整词输入）<button id="btnSay">🔊 发音</button></div>'+
+       '<div class="hint">补全缺失的字母（首字母已给出）<button id="btnSay">🔊 发音</button></div>'+
        '<div class="gaps" id="gapsBox" aria-label="补全字母">';
+    h+='<span class="gap-word">';
     for(var gi=0;gi<mask.text.length;gi++){
       var ch=mask.text.charAt(gi);
-      if(mask.hide[gi]) h+='<input class="gap-in" data-i="'+gi+'" maxlength="1" inputmode="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="字母">';
+      if(ch===' '){ h+='</span><span class="gap-space"> </span><span class="gap-word">'; continue; }
+      if(mask.hide[gi]) h+='<input type="text" class="gap-in" data-i="'+gi+'" inputmode="text" enterkeyhint="done" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="缺失的字母">';
       else if(ch===' ') h+='<span class="gap-space"> </span>';
       else h+='<span class="gap-ch">'+esc(ch)+'</span>';
     }
-    h+='</div>'+
-       '<div class="spell gaps-full"><input type="text" id="gapsFull" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="或整词输入"><button class="primary" id="btnCheck">确认</button></div>';
+    h+='</span></div>'+
+       '<div class="spell gaps-act"><button class="primary" id="btnCheck">确认</button></div>';
   } else if(type==='en2zh'){
     var opts=shuffle([shortZh(zh)].concat(distractors(v,'zh',3)));
     h+='<div class="qword'+(ph?' qphrase':'')+'" id="qPrompt">'+esc(v.word)+'</div><div class="ipa">'+esc(ER.fmtIpa(v.phonetic))+' <button id="btnSay">🔊</button></div>'+
@@ -469,44 +475,43 @@ function renderTest(it){
   } else if(type==='gaps'){
     ER.speak(v.word, v.audio);
     var inputs=Array.prototype.slice.call(box.querySelectorAll('.gap-in'));
-    var full=$('gapsFull');
     var locked=false;
     var readGaps=function(){
       var chars=v.word.split('');
-      inputs.forEach(function(inp){ var i=+inp.dataset.i; chars[i]=inp.value?inp.value.charAt(0):'_'; });
+      inputs.forEach(function(inp){ chars[+inp.dataset.i]=inp.value?inp.value.charAt(0):'_'; });
       return chars.join('');
     };
     var checkG=function(){
       if(locked) return;
-      var typed=full.value.trim();
-      var got= typed? typed : readGaps();
-      if(!typed && inputs.some(function(inp){return !inp.value;})){ (inputs.find(function(inp){return !inp.value;})||inputs[0]).focus(); return; }
-      var ok= ph? normPhrase(got)===normPhrase(v.word) : norm(got)===norm(v.word);
-      locked=true; $('btnCheck').disabled=true; full.readOnly=true;
-      inputs.forEach(function(inp){ inp.readOnly=true; var want=v.word.charAt(+inp.dataset.i); var good=norm(inp.value)===norm(want); inp.classList.add(good?'right':'wrong'); if(!inp.value) inp.value=want; });
-      full.classList.add(ok?'right':'wrong');
-      if(typed) full.value=typed;
+      var empty=inputs.filter(function(inp){return !inp.value;});
+      if(empty.length){ empty[0].focus(); ER.toast('还有 '+empty.length+' 个字母没填'); return; }
+      var ok= ph? normPhrase(readGaps())===normPhrase(v.word) : norm(readGaps())===norm(v.word);
+      locked=true; $('btnCheck').disabled=true;
+      inputs.forEach(function(inp){ inp.readOnly=true; var want=v.word.charAt(+inp.dataset.i); inp.classList.add(norm(inp.value)===norm(want)?'right':'wrong'); });
       grade(it, v, ok);
     };
     inputs.forEach(function(inp, idx){
+      inp.addEventListener('focus',function(){ if(!locked) try{ inp.select(); }catch(e){} });
       inp.addEventListener('input',function(){
         if(locked) return;
         var val=inp.value.replace(/[^A-Za-z'-]/g,'');
-        inp.value=val?val.charAt(val.length-1):'';
+        if(val.length>1){   // 粘贴 / 键盘一次输入多个字母：依次填到后面的格子
+          var j=idx; for(var k=0;k<val.length && j<inputs.length;k++,j++) inputs[j].value=val.charAt(k).toLowerCase();
+          (inputs[Math.min(j,inputs.length-1)]).focus(); return;
+        }
+        inp.value=val.toLowerCase();
         if(inp.value && idx+1<inputs.length) inputs[idx+1].focus();
-        else if(inp.value) full.focus();
       });
       inp.addEventListener('keydown',function(e){
-        if(locked) return;
-        if(e.key==='Backspace' && !inp.value && idx>0){ e.preventDefault(); inputs[idx-1].focus(); inputs[idx-1].value=''; }
+        if(locked){ if(e.key==='Enter'){ e.preventDefault(); var n=$('btnNext'); if(n&&!n.hidden) n.click(); } return; }
+        if(e.key==='Backspace' && !inp.value && idx>0){ e.preventDefault(); inputs[idx-1].value=''; inputs[idx-1].focus(); }
         else if(e.key==='Enter'){ e.preventDefault(); checkG(); }
-        else if(e.key==='ArrowLeft' && idx>0){ inputs[idx-1].focus(); }
-        else if(e.key==='ArrowRight' && idx+1<inputs.length){ inputs[idx+1].focus(); }
+        else if(e.key==='ArrowLeft' && idx>0){ e.preventDefault(); inputs[idx-1].focus(); }
+        else if(e.key==='ArrowRight' && idx+1<inputs.length){ e.preventDefault(); inputs[idx+1].focus(); }
       });
     });
-    full.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); checkG(); } });
     $('btnCheck').onclick=checkG;
-    setTimeout(function(){ try{ (inputs[0]||full).focus(); }catch(e){} },50);
+    setTimeout(function(){ try{ if(inputs[0]) inputs[0].focus(); }catch(e){} },50);
   } else {
     Array.prototype.forEach.call(box.querySelectorAll('.opts button'),function(b){
       b.onclick=function(){
@@ -549,7 +554,7 @@ function grade(it, v, ok){
     // 本轮稍后再出现（最多重练 2 次）
     if(it.retry<2){
       var pos=Math.min(S.queue.length, S.idx+4);
-      S.queue.splice(pos,0,{kind:'test',word:v.word,first:false,retry:it.retry+1,isNew:it.isNew});
+      S.queue.splice(pos,0,{kind:'test',word:v.word,first:false,retry:it.retry+1,isNew:it.isNew,keepType:it.type});
     }
   }
   var nb=$('btnNext'); nb.hidden=false; nb.onclick=advance;

@@ -164,17 +164,13 @@ def run_session(page, wrong=(), allow_retry_wrong=False, max_steps=200, log=None
             page.fill("#clozeInput", ("zz" + ans) if bad else ans)
             act(page.locator("#btnCheck"))
         elif st["type"] == "gaps":
-            if bad:
-                page.fill("#gapsFull", "zzzz")
-            else:
-                if page.locator(".gap-in").count():
-                    page.evaluate("""(w)=>{
-                      document.querySelectorAll('.gap-in').forEach(inp=>{
-                        inp.value = w.charAt(+inp.dataset.i);
-                      });
-                    }""", st["word"])
-                else:
-                    page.fill("#gapsFull", st["word"])
+            entry["full_input"] = page.locator("#qCard input:not(.gap-in)").count()
+            page.evaluate("""([w, bad])=>{
+              document.querySelectorAll('.gap-in').forEach(inp=>{
+                var c = w.charAt(+inp.dataset.i);
+                inp.value = bad ? (c.toLowerCase()==='q' ? 'x' : 'q') : c;
+              });
+            }""", [st["word"], bad])
             act(page.locator("#btnCheck"))
         elif st["type"] == "order":
             n = page.locator("#orderPool .tile").count()
@@ -790,6 +786,49 @@ with sync_playwright() as p:
     check("cloze question for contribute", by.get("contribute", {}).get("type") == "cloze" and by["contribute"]["ok"], str(by.get("contribute")))
     check("gaps question for acutely (wrong resets)", by.get("acutely", {}).get("type") == "gaps" and not by["acutely"]["ok"], str(by.get("acutely")))
     check("wrong gaps -> stage 0", (word(qp, "acutely") or {}).get("srs", {}).get("stage") == 0)
+    rq = [e for e in qlog if e["word"] == "acutely" and not e["first"]]
+    check("再练一次 keeps the letter-gap type", len(rq) >= 1 and all(e["type"] == "gaps" for e in rq), str(rq))
+    check("gaps questions never show a whole-word input", all(e.get("full_input", 0) == 0 for e in qlog if e["type"] == "gaps"))
+    rot = qp.evaluate("""()=>{var w='authors stress', out=[]; for(var q=0;q<5;q++) out.push(SRS.qtype(w,{qn:q})); return out;}""")
+    check("rotation has spell and gaps as distinct types", sorted(set(rot)) == sorted(["spell", "en2zh", "zh2en", "cloze", "gaps"]), str(rot))
+    # phrase letter-gaps: only letter boxes; spelling: only the whole input
+    qp.evaluate("""()=>{ER.addWord({word:'authors stress',type:'phrase',zh:'作者强调',source:'manual'});
+      var v=ER.findWord('authors stress'); v.srs.due='2026-10-23'; v.srs.stage=1; ER.saveVocab();}""")
+    qp.reload(); goto(qp, "2026-10-23", "#/review"); qp.wait_for_selector("#statDue")
+    force_type(qp, "authors stress", "gaps")
+    qp.click("#btnStart"); qp.wait_for_selector("#qCard[data-type=gaps]")
+    qp.wait_for_function("document.activeElement && document.activeElement.classList.contains('gap-in')", timeout=3000)
+    gq = qp.evaluate("""()=>{var c=document.getElementById('qCard'); return {hint:c.querySelector('.hint').textContent, html:c.innerHTML,
+       boxes:c.querySelectorAll('.gap-in').length, others:c.querySelectorAll('input:not(.gap-in),textarea').length,
+       vals:[...c.querySelectorAll('.gap-in')].map(i=>i.value).join(''), ph:[...c.querySelectorAll('.gap-in')].map(i=>i.placeholder).join(''),
+       attrs:[...c.querySelectorAll('.gap-in')].every(i=>i.getAttribute('autocapitalize')==='off'&&i.getAttribute('autocorrect')==='off'&&i.getAttribute('autocomplete')==='off'&&i.spellcheck===false),
+       tag:c.querySelector('.qtype').textContent, focus:document.activeElement===c.querySelector('.gap-in')}}""")
+    check("gaps phrase: only letter boxes, no whole-word input", gq["boxes"] >= 2 and gq["others"] == 0 and qp.locator("#gapsFull").count() == 0, str({k: gq[k] for k in ("boxes", "others")}))
+    check("gaps hint text updated", "补全缺失的字母（首字母已给出）" in gq["hint"] and "整词" not in gq["hint"], gq["hint"])
+    check("gaps: answer not pre-shown anywhere", "authors stress" not in gq["html"] and "authors" not in gq["html"] and "stress" not in gq["html"] and gq["vals"] == "" and gq["ph"] == "")
+    check("gaps: inputs autocapitalize/autocorrect/autocomplete/spellcheck off, first box focused", gq["attrs"] and gq["focus"])
+    hidden = qp.evaluate("[...document.querySelectorAll('.gap-in')].map(i=>'authors stress'.charAt(+i.dataset.i)).join('')")
+    qp.keyboard.type(hidden[:2])
+    check("gaps: typing auto-advances", qp.evaluate("[...document.querySelectorAll('.gap-in')].indexOf(document.activeElement)") == min(2, len(hidden) - 1))
+    qp.keyboard.press("Backspace")
+    pos_after = qp.evaluate("[...document.querySelectorAll('.gap-in')].indexOf(document.activeElement)")
+    if len(hidden) > 2:
+        check("gaps: backspace on empty box clears previous + moves back", qp.evaluate("[...document.querySelectorAll('.gap-in')].indexOf(document.activeElement)") == 1
+              and qp.evaluate("document.querySelectorAll('.gap-in')[1].value") == "", str(pos_after))
+        qp.keyboard.type(hidden[1:])
+    else:
+        qp.keyboard.type(hidden[len(hidden) - 1:])
+    qp.keyboard.press("Enter")
+    qp.wait_for_selector("#btnNext:not([hidden])")
+    check("gaps: Enter submits, correct", "正确" in qp.inner_text("#feedback"), qp.inner_text("#feedback"))
+    qp.keyboard.press("Enter"); qp.wait_for_timeout(200)
+    force_type(qp, "authors stress", "spell")
+    qp.evaluate("""()=>{var v=ER.findWord('authors stress'); v.srs.due='2026-10-23'; ER.saveVocab();}""")
+    qp.reload(); goto(qp, "2026-10-23", "#/review"); qp.wait_for_selector("#statDue")
+    force_type(qp, "authors stress", "spell")
+    qp.click("#btnStart"); qp.wait_for_selector("#qCard[data-type=spell]")
+    check("spelling: only the whole input, no letter boxes", qp.locator("#qCard .gap-in").count() == 0 and qp.locator("#spellInput").count() == 1
+          and qp.input_value("#spellInput") == "" and "听写" in qp.inner_text("#qCard .qtype"))
     check("cloze phrase blanks whole phrase", by.get("make ends meet", {}).get("type") == "cloze" and by["make ends meet"]["ok"], str(by.get("make ends meet")))
     # CET examples file available for words without source ex
     ex = qp.evaluate("""async()=>{
@@ -814,7 +853,9 @@ with sync_playwright() as p:
     force_type(qmp, "statue", "gaps")
     qmp.click("#btnStart")
     qmp.wait_for_selector("#qCard[data-type=gaps]")
-    check("mobile gaps: letter inputs present", qmp.locator(".gap-in").count() >= 1)
+    check("mobile gaps: letter inputs present, no whole-word input", qmp.locator(".gap-in").count() >= 1 and qmp.locator("#qCard input:not(.gap-in)").count() == 0)
+    check("mobile gaps: boxes >=16px (no iOS zoom), no overflow",
+          qmp.evaluate("[...document.querySelectorAll('.gap-in')].every(i=>parseFloat(getComputedStyle(i).fontSize)>=16)") and qmp.evaluate("document.documentElement.scrollWidth<=innerWidth+1"))
     qmp.evaluate("""(w)=>{document.querySelectorAll('.gap-in').forEach(inp=>{inp.value=w.charAt(+inp.dataset.i);});}""", "statue")
     qmp.locator("#btnCheck").tap()
     qmp.wait_for_selector("#btnNext:not([hidden])")
