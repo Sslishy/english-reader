@@ -297,14 +297,17 @@ function renderArticle(a, isNewest){
   h+='<article class="reader" id="articleReader"><h2>'+tokenize(a.title)+'</h2>';
   h+='<div class="art-title-zh">'+esc(a.title_zh||'')+'</div>';
   h+='<details class="summary"><summary>中文导读（建议读完英文后再看）</summary><div style="margin-top:6px;font-family:-apple-system,\'PingFang SC\',sans-serif;font-size:15px;line-height:1.7">'+esc(a.summary_zh||'')+'</div></details>';
+  var tp=!!ER.practiceBox;
   (a.paragraphs||[]).forEach(function(p,i){
-    if(!zh){ h+='<p>'+tokenize(p)+'</p>'; return; }
-    h+='<p data-pi="'+i+'">'+tokenize(p)+'<button type="button" class="zh-btn" data-zh="'+i+'" aria-controls="pzh'+i+'" aria-expanded="'+(shown[i]?'true':'false')+'" title="显示 / 隐藏本段中文译文">译</button></p>'+
-       '<div class="para-zh" id="pzh'+i+'" lang="zh-CN"'+(shown[i]?'':' hidden')+'>'+esc(zh[i])+'</div>';
+    h+='<p data-pi="'+i+'">'+tokenize(p)+
+       (zh?'<button type="button" class="zh-btn" data-zh="'+i+'" aria-controls="pzh'+i+'" aria-expanded="'+(shown[i]?'true':'false')+'" title="显示 / 隐藏本段中文译文">译</button>':'')+
+       (tp?ER.practiceButton(a,i):'')+'</p>';
+    if(zh) h+='<div class="para-zh" id="pzh'+i+'" lang="zh-CN"'+(shown[i]?'':' hidden')+'>'+esc(zh[i])+'</div>';
+    if(tp) h+=ER.practiceBox(a,i);
   });
   h+='</article>';
   h+='<p class="hint">来源：<a href="'+esc(a.source_url)+'" target="_blank" rel="noopener">'+esc(a.source_name||a.source_url)+'</a>（本文为根据该报道改写的原创学习文章）</p>';
-  h+='<p class="hint">'+READ_HINT+(zh?' · 点段末「译」或上方「全文对照」看整段中文译文（AI 逐段精译，建议先自己读懂再对照）':'')+'</p></div>';
+  h+='<p class="hint">'+READ_HINT+(zh?' · 点段末「译」或上方「全文对照」看整段中文译文（AI 逐段精译，建议先自己读懂再对照）':'')+' · 点「我来翻译」自己译这一段，提交后由 DeepSeek AI 批改'+'</p></div>';
   if(a.key_words&&a.key_words.length){
     h+='<div class="card"><h3 class="card-title">🔑 重点词汇</h3><div class="kw-list">';
     a.key_words.forEach(function(k){
@@ -318,6 +321,7 @@ function renderArticle(a, isNewest){
   $('articleBox').innerHTML=h;
   syncZhAll();
   refreshHighlights();
+  if(ER.practiceAfterRender) ER.practiceAfterRender();
 }
 /* ========== 整段中文译文（paragraphs_zh，可选） ========== */
 var ZH_KEY='er_para_zh';   // 记住「全文对照」开关：true = 默认显示全部译文
@@ -336,6 +340,8 @@ function zhState(a){
   }
   return zhMem.shown;
 }
+ER.currentArticle=function(){ return currentArticle; };
+ER.setParaZh=function(i,on){ setParaZh(i,on); syncZhAll(); };
 function setParaZh(i,on){
   zhMem.shown[i]=on;
   var d=$('pzh'+i); if(d) d.hidden=!on;
@@ -524,7 +530,7 @@ $('manAdd').onclick=function(){
 ER.buildBackup = function(){
   var s=Object.assign({},settings); delete s.text;
   return {app:'english-reader',version:2,exportedAt:new Date().toISOString(),today:today(),
-    data:{vocab:vocab, cetSeen:lsGet('er_cet_seen',{}), daily:lsGet('er_daily',{}), settings:s}};
+    data:{vocab:vocab, cetSeen:lsGet('er_cet_seen',{}), daily:lsGet('er_daily',{}), settings:s, translations:ER.getTranslations?ER.getTranslations():{}}};
 };
 ER.applyBackup = function(b, mode){
   if(!b||b.app!=='english-reader'||!b.data||!Array.isArray(b.data.vocab)) throw new Error('不是有效的备份文件');
@@ -550,6 +556,7 @@ ER.applyBackup = function(b, mode){
     Object.keys(b.data.cetSeen||{}).forEach(function(k){ if(!seen[k]) seen[k]=b.data.cetSeen[k]; });
   }
   lsSet('er_cet_seen',seen);
+  if(b.data.translations&&ER.mergeTranslations) ER.mergeTranslations(b.data.translations);
   saveVocab(applyOpt);
   return vocab.length;
 };
@@ -576,7 +583,10 @@ $('importFile').onchange=function(){
 function mergeDaily(a,b){ a=a||{}; b=b||{}; if(!b.date) return a; if(!a.date||b.date>a.date) return {date:b.date,newDone:+b.newDone||0}; if(b.date===a.date) return {date:a.date,newDone:Math.max(+a.newDone||0,+b.newDone||0)}; return a; }
 ER.syncState = function(){
   var s=Object.assign({},settings); delete s.text;
-  return {app:'english-reader',format:1,vocab:vocab,tombstones:getTombs(),daily:lsGet('er_daily',{}),cetSeen:lsGet('er_cet_seen',{}),settings:s,settingsAt:+lsGet('er_settings_at',0)||0};
+  var st={app:'english-reader',format:1,vocab:vocab,tombstones:getTombs(),daily:lsGet('er_daily',{}),cetSeen:lsGet('er_cet_seen',{}),settings:s,settingsAt:+lsGet('er_settings_at',0)||0};
+  // 翻译练习的草稿 + 批改（没有时不写这个字段，保持和旧数据完全一致）
+  var tr=ER.getTranslations&&ER.getTranslations(); if(tr&&Object.keys(tr).length) st.translations=tr;
+  return st;
 };
 /* 把远端数据并入本机（只增不丢），返回合并后的整份数据 */
 ER.mergeRemoteState = function(r){
@@ -586,6 +596,7 @@ ER.mergeRemoteState = function(r){
   saveVocab({tombs:tombs, fromSync:true});
   var d=mergeDaily(lsGet('er_daily',{}), r.daily); lsSet('er_daily',d,true);
   var seen=lsGet('er_cet_seen',{}); Object.keys(r.cetSeen||{}).forEach(function(k){ if(!seen[k]) seen[k]=r.cetSeen[k]; }); lsSet('er_cet_seen',seen,true);
+  if(r.translations&&ER.mergeTranslations) ER.mergeTranslations(r.translations);
   var la=+lsGet('er_settings_at',0)||0;
   if(r.settings && (+r.settingsAt||0)>la){
     var keepText=settings.text; Object.assign(settings,r.settings); settings.text=keepText;
@@ -1025,7 +1036,7 @@ function snapRange(r0){
   if(ew){ if(r.endContainer.nodeType===3&&r.endOffset===0&&sw!==ew) r.setEndBefore(ew); else r.setEndAfter(ew); }
   return r;
 }
-var ZH_SKIP='.para-zh,.zh-btn';
+var ZH_SKIP='.para-zh,.zh-btn,.tp-btn,.tp';
 function inZh(n){ var e=n&&(n.nodeType===1?n:n.parentElement); return !!(e&&e.closest&&e.closest(ZH_SKIP)); }
 /* 选区文字（跳过跨段选择时夹在中间的中文译文和「译」按钮） */
 function rangeText(r){

@@ -704,6 +704,7 @@ with sync_playwright() as p:
     connect(A)
     check("first connect creates one secret gist", sum(1 for m, p_ in gh.calls if m == "POST") == 1 and gh.gists["gist1"]["public"] is False)
     check("gist contains vocab incl. phrase", sorted(v["word"] for v in gh.data()["vocab"]) == ["alpha", "beta", "make ends meet"])
+    check("gist format unchanged when no translations exist", "translations" not in gh.data())
     check("sync status shows last sync time", "上次同步" in A.inner_text("#syncStatus"), A.inner_text("#syncStatus"))
     check("token is stored only locally and not in backups", TOKEN not in A.evaluate("JSON.stringify(ER.buildBackup())") and TOKEN not in json.dumps(gh.data()))
     cb, Bp = device("deviceB")
@@ -1032,6 +1033,189 @@ with sync_playwright() as p:
     tq.evaluate("ER.hidePop()")
     tq.locator("#pzh2").scroll_into_view_if_needed(); tq.screenshot(path="/tmp/er_mobile_para_zh.png")
     tm.close()
+
+    # ---------- 20. 我来翻译 + DeepSeek feedback (DeepSeek + GitHub mocked) ----------
+    DS_KEY = "sk-" + "t" * 32   # fake test key
+    ONE_IN_THREE_EN = "Even in Europe and Central Asia, where the rate is lowest, more than one in three are paid informally."
+    FEEDBACK = ("## 总评\n整体意思基本正确，**数字**也译对了。\n\n## 逐句点评\n> " + ONE_IN_THREE_EN + "\n"
+                "- **问题**：「工资率最低」把 the rate 理解错了。\n- **怎么译**：the rate 指上一句的非正规就业比例；中文先说地点再说比例。\n- **改为**：即使在这一比例最低的欧洲和中亚地区……\n\n"
+                "## 参考译文\n即使在这一比例最低的欧洲和中亚地区，也有超过三分之一的家政工是以非正式方式领取报酬的。\n\n## 小结\n1. 先找主干\n2. 注意 one in three = 三分之一\n"
+                "<img src=x onerror=\"window.__xss=1\"><script>window.__xss=2</script>")
+    class FakeDS:
+        def __init__(self):
+            self.mode, self.calls, self.hung = "ok", [], []
+        def cors(self):
+            return {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization,content-type", "Access-Control-Allow-Methods": "GET,POST"}
+        def handle(self, route):
+            req = route.request
+            if req.method == "OPTIONS":
+                return route.fulfill(status=204, headers=self.cors(), body="")
+            auth = req.headers.get("authorization", "")
+            if req.url.endswith("/user/balance"):
+                if auth != "Bearer " + DS_KEY:
+                    return route.fulfill(status=401, headers=self.cors(), content_type="application/json", body='{"error":{"message":"Authentication Fails"}}')
+                return route.fulfill(status=200, headers=self.cors(), content_type="application/json",
+                                     body=json.dumps({"is_available": True, "balance_infos": [{"currency": "CNY", "total_balance": "12.34"}]}))
+            self.calls.append({"auth": auth, "body": json.loads(req.post_data or "{}")})
+            m = self.mode
+            if m == "hang":
+                self.hung.append(route); return
+            if m == "offline":
+                return route.abort("internetdisconnected")
+            if m in ("401", "402", "429", "500"):
+                return route.fulfill(status=int(m), headers=self.cors(), content_type="application/json", body='{"error":{"message":"x"}}')
+            if m == "json":
+                return route.fulfill(status=200, headers=self.cors(), content_type="application/json",
+                                     body=json.dumps({"choices": [{"message": {"role": "assistant", "content": "## 总评\n非流式也可以。"}, "finish_reason": "stop"}]}))
+            parts = [FEEDBACK[i:i + 40] for i in range(0, len(FEEDBACK), 40)]
+            sse = "".join("data: " + json.dumps({"choices": [{"delta": {"content": p_}, "finish_reason": None}]}, ensure_ascii=False) + "\n\n" for p_ in parts)
+            sse = ": keep-alive\n\n" + sse + "data: " + json.dumps({"choices": [{"delta": {}, "finish_reason": "stop"}]}) + "\n\ndata: [DONE]\n\n"
+            route.fulfill(status=200, headers=self.cors(), content_type="text/event-stream; charset=utf-8", body=sse)
+    ds = FakeDS(); gh2 = FakeGitHub()
+    def tdevice(tag, mobile=False):
+        kw = dict(viewport={"width": 390, "height": 760}, has_touch=True, is_mobile=True, device_scale_factor=3) if mobile else dict(viewport={"width": 1100, "height": 900})
+        c = browser.new_context(**kw); mock_routes(c)
+        c.route(re.compile(r"https://api\.github\.com/.*"), gh2.handle); c.route(re.compile(r"https://api\.deepseek\.com/.*"), ds.handle)
+        pg = c.new_page(); attach(pg, tag); pg.on("dialog", lambda d: d.accept())
+        goto(pg, "2026-10-28", "#/read/2026-10-28"); pg.wait_for_selector("#articleReader .tp-btn")
+        pg.evaluate("ER.SYNC_DEBOUNCE=150")
+        return c, pg
+    def wait_done(pg, i=2):
+        pg.wait_for_function(f"!document.querySelector('[data-tpsend=\"{i}\"]').disabled && document.querySelector('#tpSt{i}') && !document.querySelector('#tpSt{i} .spinner')", timeout=15000)
+    tA_ctx, tA = tdevice("tp-A")
+    check("tp: one 我来翻译 button per paragraph, boxes closed", tA.locator("#articleReader .tp-btn").count() == n28 and tA.locator("#articleReader .tp:not([hidden])").count() == 0)
+    tA.click("#btnZhAll")   # reference translations all visible ...
+    tA.click('#articleReader .tp-btn[data-tp="2"]')
+    check("tp: opening practice box hides that paragraph's reference (write first)",
+          tA.is_visible("#tp2") and tA.is_hidden("#pzh2") and tA.is_visible("#pzh1") and tA.get_attribute('.tp-btn[data-tp="2"]', "aria-expanded") == "true")
+    check("tp: practice box sits under its paragraph",
+          tA.evaluate("(()=>{var p=document.querySelector('#articleReader p[data-pi=\"2\"]');var n=p.nextElementSibling;if(n.id==='pzh2')n=n.nextElementSibling;return n.id})()") == "tp2")
+    tA.click('[data-tpsend="2"]')
+    check("tp: empty submit asks to write first", "先写下你的译文" in tA.inner_text("#tpErr2") and len(ds.calls) == 0)
+    MY = "各地区情况不同。即使在欧洲和中亚，工资率最低，三分之一的工资是非正式的。"
+    tA.fill("#tpIn2", MY)
+    tA.click('[data-tpsend="2"]')
+    check("tp: no key -> Chinese hint + settings button, no request", "API 密钥" in tA.inner_text("#tpErr2") and tA.locator('#tpErr2 [data-tpsettings]').count() == 1 and len(ds.calls) == 0)
+    tA.click('#tpErr2 [data-tpsettings]')
+    check("tp: settings opens with DeepSeek key field", tA.is_visible("#settingsPanel") and tA.is_visible("#optDsKey"))
+    tA.fill("#optDsKey", "sk-wrong-key-123456")
+    tA.click("#btnDsTest"); tA.wait_for_function("!document.querySelector('#dsStatus .spinner') && document.querySelector('#dsStatus').textContent.length>3")
+    check("tp: 测试密钥 reports invalid key (401)", "401" in tA.inner_text("#dsStatus") and "无效" in tA.inner_text("#dsStatus"), tA.inner_text("#dsStatus"))
+    tA.fill("#optDsKey", DS_KEY)
+    tA.click("#btnDsTest"); tA.wait_for_function("document.querySelector('#dsStatus').textContent.includes('密钥有效')")
+    check("tp: 测试密钥 shows balance", "¥12.34" in tA.inner_text("#dsStatus"), tA.inner_text("#dsStatus"))
+    tA.click("#btnDsSave")
+    check("tp: key saved only in er_ds_key, input cleared, masked",
+          tA.evaluate("localStorage.getItem('er_ds_key')") == DS_KEY and tA.input_value("#optDsKey") == "" and DS_KEY not in tA.inner_text("#dsStatus") and "已保存" in tA.inner_text("#dsStatus"))
+    check("tp: key not in settings / backup", DS_KEY not in tA.evaluate("JSON.stringify(ER.settings)+JSON.stringify(ER.buildBackup())+JSON.stringify(ER.syncState())"))
+    tA.click("#btnCloseSettings")
+    tA.click('[data-tpsend="2"]'); wait_done(tA)
+    req = ds.calls[-1] if ds.calls else {"auth": "", "body": {}}
+    b_ = req["body"]; msgs = b_.get("messages", [])
+    check("tp: request = deepseek-chat, auth header, max_tokens ~800, streaming",
+          req["auth"] == "Bearer " + DS_KEY and b_.get("model") == "deepseek-chat" and 600 <= b_.get("max_tokens", 0) <= 1000 and b_.get("stream") is True, json.dumps({k: v for k, v in b_.items() if k != "messages"}))
+    check("tp: prompt has English paragraph, reference hint and user's translation",
+          len(msgs) == 2 and msgs[0]["role"] == "system" and ONE_IN_THREE_EN in msgs[1]["content"] and ONE_IN_THREE in msgs[1]["content"] and MY in msgs[1]["content"]
+          and "对照参考译文" in msgs[0]["content"] and "参考译文" in msgs[0]["content"])
+    fbtxt = tA.inner_text("#tpFb2")
+    check("tp: feedback rendered (headings, quoted English, bold)",
+          tA.locator("#tpFb2 h4").count() >= 4 and ONE_IN_THREE_EN in tA.inner_text("#tpFb2 blockquote") and tA.locator("#tpFb2 strong").count() >= 3 and "参考译文" in fbtxt, fbtxt[:200])
+    check("tp: model HTML is escaped (no img/script, no XSS)",
+          tA.locator("#tpFb2 img, #tpFb2 script").count() == 0 and tA.evaluate("window.__xss") is None and "<img src=x" in fbtxt)
+    tr = tA.evaluate("ER.lsGet('er_tr',{})")
+    e2 = tr.get("2026-10-28#2", {})
+    check("tp: draft + feedback saved per article+paragraph", e2.get("text") == MY and "总评" in e2.get("fb", "") and e2.get("fbFor") == MY and e2.get("updatedAt", 0) > 0, str(list(tr)))
+    tA.reload(); tA.wait_for_selector("#articleReader .tp-btn")
+    check("tp: after reload button marked + box closed", "has" in tA.get_attribute('.tp-btn[data-tp="2"]', "class") and tA.is_hidden("#tp2"))
+    tA.click('.tp-btn[data-tp="2"]')
+    check("tp: after reload draft + feedback restored", tA.input_value("#tpIn2") == MY and "总评" in tA.inner_text("#tpFb2") and tA.is_visible("#tpFb2"))
+    check("tp: reference not hidden-toggled when feedback exists (译 still usable)", tA.locator('.zh-btn[data-zh="2"]').count() == 1)
+    tA.fill("#tpIn2", MY + "（改）"); tA.wait_for_timeout(600)
+    check("tp: edited draft autosaved + feedback marked as for previous version",
+          tA.evaluate("ER.lsGet('er_tr',{})['2026-10-28#2'].text").endswith("（改）") and "上次提交" in tA.inner_text("#tpFb2"))
+    for mode_, want in [("401", "密钥无效"), ("402", "余额不足"), ("429", "太频繁"), ("500", "繁忙"), ("offline", "网络连接失败")]:
+        ds.mode = mode_
+        tA.click('[data-tpsend="2"]'); wait_done(tA)
+        et = tA.inner_text("#tpErr2")
+        check(f"tp: error {mode_} -> Chinese message, old feedback kept", want in et and tA.is_visible("#tpErr2") and "总评" in tA.inner_text("#tpFb2"), et)
+    ds.mode = "hang"; tA.evaluate("ER.DS_TIMEOUT=700")
+    tA.click('[data-tpsend="2"]')
+    check("tp: loading state while waiting", tA.locator('[data-tpsend="2"]').is_disabled() and "批改中" in tA.inner_text('[data-tpsend="2"]') and tA.locator("#tpSt2 .spinner").count() == 1)
+    wait_done(tA)
+    check("tp: timeout -> Chinese message", "超时" in tA.inner_text("#tpErr2"), tA.inner_text("#tpErr2"))
+    for r_ in ds.hung:
+        try: r_.abort()
+        except Exception: pass
+    ds.hung.clear()
+    ds.mode = "json"; tA.evaluate("ER.DS_TIMEOUT=60000")
+    tA.click('[data-tpsend="2"]'); wait_done(tA)
+    check("tp: non-streaming JSON reply also works", "非流式也可以" in tA.inner_text("#tpFb2") and tA.is_hidden("#tpErr2"))
+    ds.mode = "ok"
+    tA.click('[data-tpsend="2"]'); wait_done(tA)
+    check("tp: retry after errors succeeds", "逐句点评" in tA.inner_text("#tpFb2") and tA.is_hidden("#tpErr2"))
+    # existing reading features still work with practice boxes open
+    tA.locator('#articleReader .w[data-w="informally"]').last.dblclick()
+    tA.wait_for_function("document.querySelector('#pop.show') && !document.querySelector('#pop .spinner')")
+    check("tp: double-click lookup still works", tA.evaluate("document.querySelector('#articleReader .w.active').dataset.w") == "informally" and tA.locator("#pop.phrase").count() == 0)
+    tA.mouse.click(5, 880); tA.wait_for_timeout(100)
+    tA.click('.tp-btn[data-tp="1"]'); tA.fill("#tpIn1", "这份报告")
+    drag_select(tA, '#articleReader p[data-pi="1"] .w >> nth=-1', '#articleReader p[data-pi="2"] .w >> nth=1')
+    wait_phrase_pop(tA)
+    pt2 = tA.inner_text("#phraseText")
+    check("tp: drag-select across an open practice box skips it", not CJK.search(pt2) and pt2.startswith("protection") and pt2.endswith("situation"), pt2)
+    tA.click("#pop .pop-close"); tA.evaluate("getSelection().removeAllRanges()")
+    tA.evaluate("""()=>{var d=document.querySelector('#tpFb2 blockquote'), r=document.createRange(); r.selectNodeContents(d);
+      var s=getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new Event('selectionchange'));}""")
+    tA.wait_for_timeout(900)
+    check("tp: selecting English inside feedback opens no popup", tA.locator("#pop.show").count() == 0)
+    tA.evaluate("getSelection().removeAllRanges()")
+    zv0 = tA.is_visible("#pzh2"); tA.click('.zh-btn[data-zh="2"]')
+    check("tp: 译 still toggles reference while practising", tA.is_visible("#pzh2") != zv0 and tA.is_visible("#tp2"))
+    tA.click("#btnAddAllKw"); tA.wait_for_selector("#tpIn1")
+    check("tp: vocab add-all still works + boxes survive re-render", len(vocab(tA)) == len(a28["key_words"]) and tA.is_visible("#tp1") and tA.input_value("#tpIn1") == "这份报告")
+    # gist sync: translations synced, key never
+    tA.click('a[data-tab="vocab"]'); tA.wait_for_selector("#syncCard")
+    tA.fill("#syncToken", TOKEN); tA.click("#btnSyncConnect")
+    tA.wait_for_function("ER.lsGet('er_sync_meta',{}).state==='ok'")
+    gd = gh2.data()
+    check("tp: translations + feedback in gist", "2026-10-28#2" in gd.get("translations", {}) and "逐句点评" in gd["translations"]["2026-10-28#2"]["fb"] and gd["translations"].get("2026-10-28#1", {}).get("text") == "这份报告")
+    check("tp: DeepSeek key never in gist", DS_KEY not in json.dumps(gd) and "er_ds_key" not in json.dumps(gd))
+    tB_ctx, tB = tdevice("tp-B", mobile=True)
+    check("tp: other device starts without key", tB.evaluate("localStorage.getItem('er_ds_key')") is None)
+    tB.evaluate("ER.lsSet('er_tr',{'2026-10-28#0':{text:'每天，数以百万计的人',fb:'',fbFor:'',fbAt:0,updatedAt:Date.now()}})")
+    tB.reload(); tB.wait_for_selector("#articleReader .tp-btn")
+    tB.evaluate(f"localStorage.setItem('er_sync_token','{TOKEN}')"); tB.evaluate("ER.syncNow('test')")
+    tB.reload(); tB.wait_for_selector("#articleReader .tp-btn")
+    tB.locator('.tp-btn[data-tp="2"]').tap()
+    check("tp: phone receives draft + feedback via sync", tB.input_value("#tpIn2").startswith(MY) and "逐句点评" in tB.inner_text("#tpFb2"))
+    tA.evaluate("ER.syncNow('test')")
+    check("tp: both devices' paragraphs merged", tA.evaluate("ER.lsGet('er_tr',{})['2026-10-28#0'].text") == "每天，数以百万计的人" and tB.evaluate("ER.lsGet('er_tr',{})['2026-10-28#1'].text") == "这份报告")
+    tB.fill("#tpIn2", "手机上改过的译文"); tB.wait_for_timeout(600); tB.evaluate("ER.syncNow('test')"); tA.evaluate("ER.syncNow('test')")
+    check("tp: newer edit wins on same paragraph", tA.evaluate("ER.lsGet('er_tr',{})['2026-10-28#2'].text") == "手机上改过的译文")
+    check("tp: old-format gist data (no translations) keeps local ones",
+          tA.evaluate("(()=>{var s=ER.syncState();delete s.translations;ER.mergeRemoteState(s);return !!ER.lsGet('er_tr',{})['2026-10-28#2']})()"))
+    # mobile layout + flow
+    tB.evaluate(f"localStorage.setItem('er_ds_key','{DS_KEY}')")
+    fs = tB.evaluate("parseFloat(getComputedStyle(document.getElementById('tpIn2')).fontSize)")
+    h0 = tB.evaluate("document.getElementById('tpIn2').offsetHeight")
+    tB.locator("#tpIn2").tap(); tB.fill("#tpIn2", "很长的译文。" * 60); tB.wait_for_timeout(100)
+    h1 = tB.evaluate("document.getElementById('tpIn2').offsetHeight")
+    check("mobile tp: textarea >=16px (no iOS zoom) and auto-grows", fs >= 16 and h1 > h0 + 40, f"font={fs} h0={h0} h1={h1}")
+    tB.locator('[data-tpsend="2"]').tap(); wait_done(tB)
+    check("mobile tp: tap 提交 shows feedback", "逐句点评" in tB.inner_text("#tpFb2"))
+    check("mobile tp: no horizontal overflow", tB.evaluate("document.documentElement.scrollWidth<=window.innerWidth+1"))
+    tpb = tB.locator('.tp-btn[data-tp="3"]').bounding_box()
+    check("mobile tp: 我来翻译 touch target", tpb["height"] >= 28 and tpb["width"] >= 60, str(tpb))
+    tB.locator("#tp2").scroll_into_view_if_needed(); tB.screenshot(path="/tmp/er_mobile_tp.png")
+    tB.locator('#articleReader .w[data-w="informally"]').last.tap()
+    tB.wait_for_function("document.querySelector('#pop.show') && !document.querySelector('#pop .spinner')")
+    check("mobile tp: tap word still opens lookup", tB.evaluate("document.getElementById('pop').classList.contains('sheet')"))
+    tB.evaluate("ER.hidePop()")
+    tB.tap("#btnSettings")
+    check("mobile tp: key input >=16px + settings fits", tB.evaluate("parseFloat(getComputedStyle(document.getElementById('optDsKey')).fontSize)") >= 16
+          and tB.evaluate("document.documentElement.scrollWidth<=window.innerWidth+1"))
+    tB.screenshot(path="/tmp/er_mobile_settings.png")
+    tA_ctx.close(); tB_ctx.close()
 
     # ---------- 14. live lookup (optional, real network) ----------
     if LIVE:

@@ -14,6 +14,8 @@
 
 **整段译文**：文章带有 `paragraphs_zh` 时，每段末尾有一个小小的「译」按钮，点一下在该段下方显示 / 隐藏中文译文；文章顶部的「全文对照」一次显示 / 隐藏全部译文，并记住你的选择（下次打开文章默认同样显示或隐藏）。译文是逐段人工智能精译后写进文章 JSON 的，不依赖在线翻译接口，国内也能直接显示。
 
+**我来翻译（AI 批改）**：今日阅读 / 往期文章每段末尾有「我来翻译」按钮，点开后在该段下方写自己的中文译文，点「提交」由 DeepSeek（`deepseek-chat`，浏览器直接调用 `https://api.deepseek.com/chat/completions`，流式输出）批改：总评 → 逐句点评（引用英文原句，讲句子结构、语序和关键词）→ 参考译文 → 小结。批改中可点「停止」。打开练习框时如果该段译文正显示着（且还没批改过），会先把它收起来，避免先看答案。需要在 ⚙️ 设置 → 「DeepSeek 翻译批改」填你自己的 API 密钥（在 [platform.deepseek.com](https://platform.deepseek.com/api_keys) 创建，账户需要先充值少量余额），「测试密钥」调用免费的余额接口检查密钥是否可用。**密钥只保存在当前浏览器的 `er_ds_key`，不进 `er_settings`、不进备份、不进 GitHub gist 同步**；每台设备各填一次。草稿和最近一次批改保存在 `er_tr`，并随 gist 同步。
+
 所有阅读模式中：电脑**双击**、手机**轻点**单词 → 弹出音标、中文释义、英文释义、例句、发音，可一键加入生词本（加入后当天就会出现在复习里）。
 
 ### 短语 / 短句
@@ -97,8 +99,9 @@ python3 scripts/add_article.py --check                   # 校验 index.json 中
 
 ## 数据与备份
 
-localStorage 键：`er_vocab`（生词 / 短语，每条有 `word`、`type`（`"word"` 或 `"phrase"`）、`zh`、`sentence`、可选 `note`、`source`（`reading` / `manual` / `cet4` / `cet6`）以及 `srs` 进度：`stage`、`due`、`reps`、`lapses`、`last`、`qn`）、`er_cet_seen`（已学/已标记认识的四六级词）、`er_daily`（今日已学新词数）、`er_settings`、`er_cache`（查词缓存）、`er_para_zh`（「全文对照」开关，true / false）。
-「导出备份」生成 `{"app":"english-reader","version":2,"data":{vocab, cetSeen, daily, settings}}`。
+localStorage 键：`er_vocab`（生词 / 短语，每条有 `word`、`type`（`"word"` 或 `"phrase"`）、`zh`、`sentence`、可选 `note`、`source`（`reading` / `manual` / `cet4` / `cet6`）以及 `srs` 进度：`stage`、`due`、`reps`、`lapses`、`last`、`qn`）、`er_cet_seen`（已学/已标记认识的四六级词）、`er_daily`（今日已学新词数）、`er_settings`、`er_cache`（查词缓存）、`er_para_zh`（「全文对照」开关，true / false，仅本机）、`er_tr`（「我来翻译」：键为 `YYYY-MM-DD#段落序号`，值 `{text, fb, fbFor, fbAt, truncated, updatedAt}`，即草稿、最近一次批改、批改对应的译文、批改时间；会同步）、`er_ds_key`（DeepSeek API 密钥，**仅本机**，从不同步 / 备份）。
+GitHub gist 同步的 JSON 在有练习记录时多一个 `translations` 字段（内容同 `er_tr`），按每段的 `updatedAt` 取较新的一份合并；没有练习记录时格式与以前完全相同，旧数据照常可用。
+「导出备份」生成 `{"app":"english-reader","version":2,"data":{vocab, cetSeen, daily, settings, translations}}`（不含 DeepSeek 密钥；导入时 `translations` 总是按段合并）。
 「导入（合并）」：两边都有的词保留最近复习过的那份进度；「导入（覆盖本地）」：完全用备份替换。
 
 旧版单文件阅读器的生词本（同一个 `er_vocab` 键）会自动迁移：旧词进入阶段 0，当天到期。
@@ -132,5 +135,7 @@ python3 tests/test_site.py --live   # 额外做一次真实联网查词
 - 短语翻译是机器翻译（有道 / MyMemory / Google），固定搭配 / 习语可能译得生硬，建议加入前顺手改一下；匿名额度每天约 5000 字符，设置里填邮箱可提高。
 - 手机上的短语面板依赖浏览器的原生选区事件（`selectionchange`），在 iOS Safari / 安卓 Chrome 上可用；个别国产浏览器或微信内置浏览器会拦截长按选词，这时可用「生词本 → 手动添加」。
 - 短语高亮只匹配同一段落内连续出现的原词（不做词形还原，例如收藏 *make ends meet* 不会高亮 *made ends meet*）。
+- 「我来翻译」的批改由 DeepSeek 生成，偶尔会有不准确的地方；费用从你自己的 DeepSeek 账户扣（每次批改约几百到一千多 token，通常不到 1 分钱）。密钥存在浏览器 localStorage 里，请只在自己的设备上填写。
+- 旧版本页面（缓存未刷新的标签页）同步时不认识 `translations` 字段，可能把它覆盖掉；更新后请刷新其他设备上已打开的页面。
 - 数据只在当前浏览器；清除浏览器数据会丢失，请定期导出备份。
 - 每日文章需要手动（或由助手）用 `add_article.py` 添加，网站本身不会自动抓取新闻。

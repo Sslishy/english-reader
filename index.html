@@ -91,7 +91,7 @@
     </div>
     <div class="card" id="syncCard">
       <h3 class="card-title">☁️ GitHub 同步（电脑 ⇄ 手机自动同步）</h3>
-      <p class="hint">把生词本、短语、复习进度、每日新词进度和设置自动保存到你自己 GitHub 账号里的一个私密（secret）gist，多台设备填同一个 token 就会自动合并同步。</p>
+      <p class="hint">把生词本、短语、复习进度、每日新词进度、设置和「我来翻译」的译文 / 批改自动保存到你自己 GitHub 账号里的一个私密（secret）gist，多台设备填同一个 token 就会自动合并同步。</p>
       <div id="syncSetup">
         <ol class="sync-steps">
           <li>登录 GitHub 后打开 <a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=english-reader-sync" target="_blank" rel="noopener" id="syncTokenLink">生成 token 页面</a>（已自动勾选 <b>gist</b>，其他权限都不要勾）。</li>
@@ -152,6 +152,18 @@
         <input type="email" id="optEmail" placeholder="填写你自己的邮箱可提高每日翻译额度" style="min-width:220px">
       </label>
     </div>
+    <div class="ds-set" id="dsSettings">
+      <h3 class="card-title">✍️ DeepSeek 翻译批改</h3>
+      <p class="hint">阅读页每段末尾点「我来翻译」写下自己的译文，点「提交」后由 DeepSeek AI 批改。需要你自己的 DeepSeek API 密钥：登录 <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">platform.deepseek.com</a> → 左侧「API keys」→「创建 API key」，复制 <code>sk-</code> 开头的密钥粘贴到下面。账户需要先充值一点余额（几元钱就能批改很多次）。</p>
+      <div class="row ds-row">
+        <input type="password" id="optDsKey" placeholder="粘贴 DeepSeek API 密钥（sk-…）" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button class="primary" id="btnDsSave">保存</button>
+        <button id="btnDsTest" title="查询余额，不消耗额度">测试密钥</button>
+        <button id="btnDsClear" class="danger" hidden>删除</button>
+      </div>
+      <p class="hint" id="dsStatus"></p>
+      <p class="hint">🔒 密钥只保存在这台设备的浏览器里：不会同步到 GitHub gist，也不会放进备份文件。手机和电脑需要各填一次。你的译文和批改结果会随「GitHub 同步」一起同步。</p>
+    </div>
     <p class="hint">☁️ 多设备同步 / 备份：见「📒 生词本」页底部的「GitHub 同步」和「备份 / 迁移」。</p>
     <p class="hint">中文释义来自内置四六级词库、中文维基词典（zh.wiktionary）与 MyMemory 免费翻译接口（匿名每天约 5000 字符额度；填写邮箱可提高到约 50000）。都没有结果时，改用英文维基词典中的中文译词（可能是繁体）。英文释义来自 Free Dictionary API，不可用时自动改用维基词典。查过的词会缓存在本地。</p>
   </div>
@@ -164,6 +176,7 @@
 <script src="js/srs.js"></script>
 <script src="js/app.js"></script>
 <script src="js/review.js"></script>
+<script src="js/practice.js"></script>
 <script src="js/sync.js"></script>
 <script>ER.start(); ER.startSync();</script>
 </body>
