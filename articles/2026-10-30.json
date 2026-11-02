@@ -171,5 +171,64 @@
       "text": "public policy",
       "meaning_zh": "公共政策"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "What is the purpose of the regional roadmap?",
+      "options": [
+        "Remove human staff from healthcare.",
+        "Replace all national health services.",
+        "Ban every use of medical AI.",
+        "Introduce AI into health systems safely and fairly."
+      ],
+      "answer": 3,
+      "explanation": "路线图的目标是安全、公平地引入 AI，并非全面替代或禁止。",
+      "evidence": [
+        {
+          "paragraph": 0,
+          "quote": "in a safe and fair way"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Which of these is one of the roadmap's four priorities?",
+      "options": [
+        "Ending all data-quality checks.",
+        "Training health workers to use and evaluate AI tools.",
+        "Leaving responsibility for AI undefined.",
+        "Sharing private health data without protection."
+      ],
+      "answer": 1,
+      "explanation": "第四项优先任务是人员培训，既会用工具，也能判断工具结果。",
+      "evidence": [
+        {
+          "paragraph": 3,
+          "quote": "training for the workforce so staff can use AI tools well and judge their results"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "Why does the roadmap adopt a shared regional approach?",
+      "options": [
+        "Every country already has identical systems.",
+        "Only one country uses AI.",
+        "The safety, privacy and trust challenges require cooperation.",
+        "Local health workers are unnecessary."
+      ],
+      "answer": 2,
+      "explanation": "前面的安全、公平、隐私和信任问题，与此句共同说明区域合作的理由。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "No country can answer these questions alone"
+        }
+      ]
+    }
   ]
 }

@@ -175,5 +175,64 @@
       "text": "premature deaths",
       "meaning_zh": "过早死亡"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "Which overlooked effect of climate change does the passage discuss?",
+      "options": [
+        "Its effect on space travel.",
+        "Its effect on ocean shipping prices only.",
+        "Its effect on brain and mental health.",
+        "Its effect on language spelling."
+      ],
+      "answer": 2,
+      "explanation": "首段点出全文关注的大脑影响，后文扩展到认知和心理健康。",
+      "evidence": [
+        {
+          "paragraph": 0,
+          "quote": "the impact on our brains"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Which groups are described as the most vulnerable?",
+      "options": [
+        "Children, older adults and low-income communities.",
+        "Only people living in wealthy cities.",
+        "Only professional athletes.",
+        "All groups face exactly the same risk."
+      ],
+      "answer": 0,
+      "explanation": "原文明确列出三类更脆弱群体，并解释资源和环境差异。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "Children, older adults and low-income communities are therefore the most vulnerable"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "Why do the researchers call for better measurement?",
+      "options": [
+        "Measurement alone removes all pollution.",
+        "Understanding the costs may encourage governments to act.",
+        "Economic studies already include every mental-health cost.",
+        "It would make climate policies unnecessary."
+      ],
+      "answer": 1,
+      "explanation": "这是条件关系：更清楚真实成本，政府才更可能采取保护行动。",
+      "evidence": [
+        {
+          "paragraph": 5,
+          "quote": "If governments understand the true cost of climate change to our minds, they will be more likely to protect them"
+        }
+      ]
+    }
   ]
 }

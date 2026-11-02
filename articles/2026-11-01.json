@@ -155,5 +155,64 @@
       "text": "Writing Task 2",
       "meaning_zh": "（雅思）写作任务二"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "Which statement best captures the passage?",
+      "options": [
+        "Restoration has made progress, but much more funding and protection are needed.",
+        "Restoration efforts have completely failed everywhere.",
+        "All biodiversity targets have already been met.",
+        "Funding is no longer a barrier."
+      ],
+      "answer": 0,
+      "explanation": "全文先写修复进展，再写资金缺口和停止破坏栖息地的必要性。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "Money is the clearest barrier"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "What annual restoration funding level is described as necessary?",
+      "options": [
+        "About 64 million dollars.",
+        "About one billion dollars.",
+        "About 32 million dollars.",
+        "Roughly 296 billion dollars."
+      ],
+      "answer": 3,
+      "explanation": "目前约 640 亿美元，所需约 2960 亿美元；题目问的是所需年度水平。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "from about 64 billion dollars today to roughly 296 billion"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "What does the warning about using one hand to fix nature and the other to destroy it imply?",
+      "options": [
+        "Restoration should continue without any prevention.",
+        "Preventing habitat loss must accompany restoration.",
+        "Only scientists can protect nature.",
+        "All damaged ecosystems recover immediately."
+      ],
+      "answer": 1,
+      "explanation": "这句比喻强调停止破坏和修复受损生态必须同时推进。",
+      "evidence": [
+        {
+          "paragraph": 4,
+          "quote": "stopping habitat loss must go hand in hand with rebuilding damaged lands and waters"
+        }
+      ]
+    }
   ]
 }

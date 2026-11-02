@@ -1,66 +1,144 @@
-/* 间隔重复（艾宾浩斯遗忘曲线）调度——纯函数，无 DOM 依赖。
- * stage = 连续答对次数（0..6）。答对后按 INTERVALS[stage] 天后再复习，然后 stage+1。
- * stage 达到 6 = 已掌握，之后每 MASTERED_INTERVAL 天抽查一次。答错：stage 归 0，明天再复习。
- * 日期一律用 'YYYY-MM-DD' 字符串，按 UTC 计算，避免时区/夏令时误差。 */
+/* 分能力间隔复习。词义、语境、拼写各自调度；兼容旧版单一阶段数据。
+ * 同一天的重试只用于练习，不构成新的长期记忆证据。纯函数，无 DOM 依赖。 */
 (function (root) {
   'use strict';
   var INTERVALS = [1, 2, 4, 7, 15, 30];
-  var MAX_STAGE = INTERVALS.length;      // 6 = mastered
+  var MAX_STAGE = INTERVALS.length;
   var MASTERED_INTERVAL = 60;
   var TYPES = ['spell', 'en2zh', 'zh2en', 'cloze', 'gaps'];
+  var SKILLS = ['meaning', 'usage', 'spelling'];
+  var HISTORY_LIMIT = 200;
   function pad(n) { return String(n).padStart(2, '0'); }
   function parse(ymd) { var p = String(ymd).split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]); }
   function fmt(ms) { var d = new Date(ms); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
   function addDays(ymd, n) { return fmt(parse(ymd) + n * 864e5); }
   function diffDays(a, b) { return Math.round((parse(b) - parse(a)) / 864e5); }
-  function isYmd(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(parse(s)); }
-  function init(today) { return { stage: 0, due: today, reps: 0, lapses: 0, last: '', added: today, qn: 0 }; }
-  function normalize(s, today) {
-    s = Object.assign(init(today), s || {});
-    s.stage = Math.max(0, Math.min(MAX_STAGE, s.stage | 0));
+  function isYmd(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && fmt(parse(s)) === s; }
+  function count(n) { return Math.max(0, Math.floor(+n || 0)); }
+  function stage(n) { return Math.min(MAX_STAGE, count(n)); }
+  function skillState(source, today, active) {
+    var s = Object.assign({stage:0, due:today, reps:0, lapses:0, last:'', lastScored:'', lastPromoted:'', lastLapse:'', lastRating:'', successDates:[], delayedSuccess:false, known:false}, source || {});
+    s.active = active;
+    s.stage = stage(s.stage); s.reps = count(s.reps); s.lapses = count(s.lapses);
     if (!isYmd(s.due)) s.due = today;
+    ['last','lastScored','lastPromoted','lastLapse'].forEach(function(k){ if(!isYmd(s[k])) s[k]=''; });
+    s.successDates = Array.isArray(s.successDates) ? s.successDates.filter(isYmd).filter(function(d,i,a){return a.indexOf(d)===i;}).sort().slice(-30) : [];
+    s.delayedSuccess = !!s.delayedSuccess; s.known = !!s.known;
     return s;
   }
-  /* 首次作答：答对晋级，答错重置 */
-  function answer(srs, correct, today) {
-    var s = Object.assign({}, srs);
-    s.reps = (s.reps || 0) + 1; s.qn = (s.qn || 0) + 1; s.last = today;
-    if (correct) {
-      if (s.stage >= MAX_STAGE) { s.stage = MAX_STAGE; s.due = addDays(today, MASTERED_INTERVAL); }
-      else { s.due = addDays(today, INTERVALS[s.stage]); s.stage += 1; }
-    } else {
-      s.stage = 0; s.lapses = (s.lapses || 0) + 1; s.due = addDays(today, 1);
+  function syncLegacy(s) {
+    s.stage = s.skills.meaning.stage;
+    s.due = dueDate(s);
+    return s;
+  }
+  function init(today) { return normalize({added:today}, today); }
+  function normalize(source, today) {
+    var src = source && typeof source === 'object' ? source : {};
+    var s = Object.assign({stage:0,due:today,reps:0,lapses:0,last:'',added:today,qn:0}, src);
+    var old = src.skills && typeof src.skills === 'object' ? src.skills : {};
+    var legacy = {stage:s.stage,due:s.due,reps:s.reps,lapses:s.lapses,last:s.last,lastScored:s.last};
+    s.skills = Object.assign({}, old, {
+      meaning:skillState(old.meaning || legacy, today, true),
+      usage:skillState(old.usage, today, !!(old.usage && old.usage.active)),
+      spelling:skillState(old.spelling, today, !!(old.spelling && old.spelling.active))
+    });
+    s.version=2; s.reps=count(s.reps); s.lapses=count(s.lapses); s.qn=count(s.qn);
+    if(!isYmd(s.last)) s.last='';
+    if(!isYmd(s.added)) s.added=today;
+    s.history=Array.isArray(src.history) ? src.history.filter(function(e){return e && isYmd(e.date) && SKILLS.indexOf(e.skill)>=0;}).slice(-HISTORY_LIMIT).map(function(e){return Object.assign({},e);}) : [];
+    return syncLegacy(s);
+  }
+  function dueDate(srs, includeSpelling) {
+    if(!srs) return '';
+    if(!srs.skills || !srs.skills.meaning) return srs.due || '';
+    var dates=SKILLS.filter(function(k){return (includeSpelling!==false || k!=='spelling') && srs.skills[k] && srs.skills[k].active;}).map(function(k){return srs.skills[k].due;}).filter(isYmd);
+    return dates.sort()[0] || srs.due || '';
+  }
+  function record(srs, input) {
+    var opt=input || {}, date=opt.date;
+    if(!isYmd(date)) throw new Error('SRS.record requires a valid date');
+    var skill=SKILLS.indexOf(opt.skill)>=0 ? opt.skill : 'meaning';
+    var rating=['good','hard','again'].indexOf(opt.rating)>=0 ? opt.rating : 'again';
+    var s=normalize(srs,date), sk=s.skills[skill];
+    var practice=!!opt.practice, assisted=!!opt.assisted;
+    var first=!practice && sk.lastScored!==date;
+    var elapsed=first && sk.lastScored ? Math.max(0,diffDays(sk.lastScored,date)) : null;
+    // 允许旧备份的日期模拟；倒退日期不产生晋级或掌握证据。
+    if(sk.lastScored && date<sk.lastScored){ first=false; elapsed=null; }
+    sk.active=true; sk.reps++; sk.last=date;
+    s.reps++; s.qn++; s.last=date;
+    s.history.push({date:date,skill:skill,rating:rating,assisted:assisted,practice:practice,self:!!opt.self,first:first,elapsed:elapsed});
+    s.history=s.history.slice(-HISTORY_LIMIT);
+    if(first){
+      sk.lastScored=date;
+      sk.lastRating=assisted && rating==='good' ? 'hard' : rating;
+      sk.known=false;
+      if(rating==='good' && !assisted){
+        var interval=sk.stage>=MAX_STAGE ? MASTERED_INTERVAL : INTERVALS[sk.stage];
+        sk.due=addDays(date,interval);
+        sk.stage=Math.min(MAX_STAGE,sk.stage+1); sk.lastPromoted=date;
+        if(sk.successDates.indexOf(date)<0) sk.successDates.push(date);
+        sk.successDates=sk.successDates.slice(-30);
+        if(elapsed>=7) sk.delayedSuccess=true;
+      } else if(rating==='again'){
+        sk.stage=Math.max(0,sk.stage-1); sk.lapses++; s.lapses++; sk.lastLapse=date;
+        sk.due=addDays(date,1);
+        sk.successDates=[]; sk.delayedSuccess=false;
+      } else {
+        sk.due=addDays(date,sk.stage>1 ? 2 : 1);
+      }
+    } else if(!practice && rating==='again' && (!sk.lastScored || date>=sk.lastScored)){
+      // 同日先答对后发现没记住：收紧日期，但最多每天降级一次。
+      if(sk.lastLapse!==date){ sk.stage=Math.max(0,sk.stage-1); sk.lapses++; s.lapses++; sk.lastLapse=date; }
+      sk.due=sk.due<addDays(date,1) ? sk.due : addDays(date,1);
+      sk.lastRating='again'; sk.successDates=[]; sk.delayedSuccess=false; sk.known=false;
     }
-    return s;
+    // practice 不改变 due/stage；即使先做补练，也不能把已经逾期的正式复习推迟。
+    return syncLegacy(s);
   }
-  /* 同一轮里答错后的重练：不改变进度，只轮换题型 */
-  function practice(srs) { var s = Object.assign({}, srs); s.qn = (s.qn || 0) + 1; return s; }
-  function isDue(srs, today) { return !!srs && srs.due <= today; }
-  function dueList(vocab, today, cap) {
-    var list = vocab.filter(function (v) { return isDue(v.srs, today); });
-    list.sort(function (a, b) { return a.srs.due < b.srs.due ? -1 : a.srs.due > b.srs.due ? 1 : (a.srs.stage - b.srs.stage); });
-    return cap ? list.slice(0, cap) : list;
+  function nextSkill(srs, today, includeSpelling) {
+    var s=normalize(srs,today);
+    var keys=SKILLS.filter(function(k){return (includeSpelling!==false || k!=='spelling') && s.skills[k].active && s.skills[k].due<=today;});
+    keys.sort(function(a,b){return s.skills[a].due<s.skills[b].due ? -1 : s.skills[a].due>s.skills[b].due ? 1 : SKILLS.indexOf(a)-SKILLS.indexOf(b);});
+    return keys[0] || 'meaning';
   }
-  /* 未来 days 天每天到期数量（逾期计入今天） */
-  function forecast(vocab, today, days) {
-    var out = [];
-    for (var i = 0; i < days; i++) out.push({ date: addDays(today, i), count: 0 });
-    vocab.forEach(function (v) {
-      if (!v.srs) return;
-      var d = Math.max(0, diffDays(today, v.srs.due));
-      if (d < days) out[d].count++;
+  function isMastered(srs) {
+    var m=srs && srs.skills && srs.skills.meaning;
+    return !!(m && !m.known && !m.learningPending && m.stage>=3 && m.successDates && m.successDates.length>=3 && m.delayedSuccess && m.lastRating==='good');
+  }
+  function markKnown(srs, today) {
+    var s=normalize(srs,today);
+    s.skills.meaning.known=true;
+    s.skills.meaning.due=addDays(today,7);
+    return syncLegacy(s);
+  }
+  /* 老调用方兼容入口；新复习页应显式传入能力和提示情况。 */
+  function answer(srs, correct, today) { return record(srs,{skill:'meaning',rating:correct?'good':'again',date:today}); }
+  function practice(srs) { var s=normalize(srs,(srs && (srs.last || srs.added || srs.due)) || '2000-01-01'); s.qn++; return s; }
+  function isDue(srs, today, includeSpelling) { var d=dueDate(srs,includeSpelling); return !!d && d<=today; }
+  function dueList(vocab, today, cap, includeSpelling) {
+    var list=vocab.filter(function(v){return isDue(v.srs,today,includeSpelling);});
+    list.sort(function(a,b){var da=dueDate(a.srs,includeSpelling),db=dueDate(b.srs,includeSpelling); return da<db ? -1 : da>db ? 1 : (a.srs.stage-b.srs.stage);});
+    return cap ? list.slice(0,cap) : list;
+  }
+  function forecast(vocab, today, days, includeSpelling) {
+    var out=[];
+    for(var i=0;i<days;i++) out.push({date:addDays(today,i),count:0});
+    vocab.forEach(function(v){
+      var due=dueDate(v.srs,includeSpelling); if(!isYmd(due)) return;
+      var d=Math.max(0,diffDays(today,due)); if(d<days) out[d].count++;
     });
     return out;
   }
-  function hash(s) { var h = 0; s = String(s); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }
-  /* 每个词的题型按 拼写 → 英译汉 → 汉译英 → 句子填空 → 补全字母 轮换；起点由单词决定 */
-  function qtype(word, srs) { return TYPES[(hash(word) + ((srs && srs.qn) || 0)) % TYPES.length]; }
-  function stageLabel(srs, today) {
-    if (!srs) return '';
-    if (srs.stage >= MAX_STAGE) return '已掌握';
-    return '阶段 ' + srs.stage + '/' + MAX_STAGE;
+  function hash(s) { var h=0; s=String(s); for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))|0; return Math.abs(h); }
+  function qtype(word,srs) { return TYPES[(hash(word)+((srs && srs.qn)||0))%TYPES.length]; }
+  function stageLabel(srs) {
+    if(!srs) return '';
+    if(isMastered(srs)) return '词义较稳';
+    if(srs.skills && srs.skills.meaning.known) return '待抽查';
+    return '词义阶段 '+stage(srs.stage)+'/'+MAX_STAGE;
   }
-  root.SRS = { INTERVALS: INTERVALS, MAX_STAGE: MAX_STAGE, MASTERED_INTERVAL: MASTERED_INTERVAL, TYPES: TYPES,
-    addDays: addDays, diffDays: diffDays, isYmd: isYmd, init: init, normalize: normalize, answer: answer, practice: practice,
-    isDue: isDue, dueList: dueList, forecast: forecast, qtype: qtype, stageLabel: stageLabel, hash: hash };
+  root.SRS={INTERVALS:INTERVALS,MAX_STAGE:MAX_STAGE,MASTERED_INTERVAL:MASTERED_INTERVAL,TYPES:TYPES,SKILLS:SKILLS,HISTORY_LIMIT:HISTORY_LIMIT,
+    addDays:addDays,diffDays:diffDays,isYmd:isYmd,init:init,normalize:normalize,record:record,nextSkill:nextSkill,isMastered:isMastered,markKnown:markKnown,
+    answer:answer,practice:practice,dueDate:dueDate,isDue:isDue,dueList:dueList,forecast:forecast,stageLabel:stageLabel,hash:hash,qtype:qtype};
 })(typeof window !== 'undefined' ? window : this);

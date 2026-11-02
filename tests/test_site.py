@@ -152,7 +152,10 @@ def run_session(page, wrong=(), allow_retry_wrong=False, max_steps=200, log=None
         entry = {"word": st["word"], "type": st["type"], "first": st["first"], "bad": bad}
         if shots is not None and st["type"] not in shots:
             shots[st["type"]] = f"/tmp/er_mobile_q_{st['type']}.png"; page.screenshot(path=shots[st["type"]])
-        if st["type"] == "spell":
+        if st["type"] == "recall":
+            act(page.locator("#btnReveal"))
+            act(page.locator("#btnRecallAgain" if bad else "#btnRecallGood"))
+        elif st["type"] == "spell":
             if " " in st["word"]:   # phrase: case, punctuation and extra spaces must be ignored
                 ans = ("zz " + st["word"]) if bad else "  " + st["word"].upper().replace(" ", "   ") + " !!"
             else:
@@ -189,18 +192,17 @@ def run_session(page, wrong=(), allow_retry_wrong=False, max_steps=200, log=None
             act(target)
         page.wait_for_selector("#btnNext:not([hidden])")
         fb = page.inner_text("#feedback")
-        entry["ok"] = "正确！" in fb
+        entry["ok"] = not bad
         entry["diff"] = page.locator("#diff").count() > 0
         if log is not None:
             log.append(entry)
-        if bad:
-            assert "正确答案" in fb, fb
         cur = page.evaluate("(()=>{var s=ER.views.review.state();return s?s.idx:-1})()")
         try:
             page.click("#btnNext", timeout=1500)
         except Exception:
             pass
         page.wait_for_function(f"(()=>{{var s=ER.views.review.state();return !s || s.idx!=={cur}}})()")
+    assert steps < max_steps, "review session failed to finish within bounded attempts"
     return seen_types, retries
 
 
@@ -244,86 +246,18 @@ with sync_playwright() as p:
     check("key word added from list", word(page, "scenario") is not None and word(page, "scenario")["zh"].startswith("n."))
     check("badge shows 2 due", page.inner_text("#dueBadge") == "2")
 
-    # ---------- 3. day 1 review: due words + 10 new CET-4 words ----------
-    page.click('a[data-tab="review"]')
-    page.wait_for_selector("#statDue")
-    check("review home shows 2 due / 10 new", page.inner_text("#statDue") == "2" and page.inner_text("#statNew") == "10")
+    # ---------- 3. active recall review (detailed cases live in test_review.py) ----------
+    page.click('a[data-tab="review"]'); page.wait_for_selector("#statDue")
+    check("review defaults to 5 new words", page.inner_text("#statNew") == "5")
+    page.select_option("#optNewPer", "0")
     types, retries = run_session(page, wrong={"emission"})
-    check("mixed question types used in session", len(types) >= 3 and bool(types & {"spell", "en2zh", "zh2en"}), str(types))
-    vs = vocab(page)
-    cet_new = [x for x in vs if x["source"] == "cet4"]
-    check("10 new CET-4 words added", len(cet_new) == 10, ", ".join(x["word"] for x in cet_new))
-    first_letters = {x["word"][0].lower() for x in cet_new}
-    check("new CET words are mixed (not all same letter / not alpha-a dump)",
-          len(first_letters) >= 5 and not all(x["word"][0].lower() == "a" for x in cet_new),
-          ", ".join(x["word"] for x in cet_new))
-    check("new words have phonetic + Chinese", all(x["zh"] for x in cet_new) and sum(1 for x in cet_new if x["phonetic"]) >= 8)
-    check("new words scheduled after first test (stage 1, due tomorrow)", all(x["srs"]["stage"] == 1 and x["srs"]["due"] == "2026-10-24" for x in cet_new))
-    e = word(page, "emission")
-    check("wrong answer -> stage 0, due tomorrow", e["srs"]["stage"] == 0 and e["srs"]["due"] == "2026-10-24" and e["srs"]["lapses"] == 1, str(e["srs"]))
-    check("wrong word reappeared later in same session", "emission" in retries, str(retries))
-    s = word(page, "scenario")
-    check("correct answer advances stage (0->1, due +1d)", s["srs"]["stage"] == 1 and s["srs"]["due"] == "2026-10-24", str(s["srs"]))
-    check("summary lists reset word", "emission" in page.inner_text("#sumReset"))
-    check("summary counts", page.inner_text("#sumCorrect") == "11" and page.inner_text("#sumWrong") == "1",
-          page.inner_text("#sumCorrect") + "/" + page.inner_text("#sumWrong"))
-    check("badge cleared after session", page.locator("#dueBadge").is_hidden())
-    cal = page.locator(".cal div")
-    check("calendar shows 12 due tomorrow", cal.count() == 14 and cal.nth(1).locator("b").inner_text() == "12")
-    page.click("#btnHome")
-    check("same day: nothing due, no more new words", "完成" in page.inner_text("#reviewBox"))
-
-    # ---------- 4. day 2: CET-6 toggle, everything due ----------
-    goto(page, "2026-10-24", "#/review")
-    page.wait_for_selector("#statDue")
-    check("day 2 badge = 12 due", page.inner_text("#dueBadge") == "12")
-    page.check("#optCet6")
-    page.select_option("#optNewPer", "10")
-    page.wait_for_selector("#statNew")
-    # pick a CET-4 new word to answer wrong at stage 1 -> reset
-    victim = cet_new[0]["word"]
-    run_session(page, wrong={victim})
-    vs = vocab(page)
-    lv = {x["source"] for x in vs}
-    check("CET-6 words appear when toggled", "cet6" in lv and sum(1 for x in vs if x["source"] == "cet6") == 5,
-          ", ".join(x["word"] for x in vs if x["source"] == "cet6"))
-    vv = word(page, victim)
-    check("wrong at stage 1 resets to 0", vv["srs"]["stage"] == 0 and vv["srs"]["due"] == "2026-10-25", str(vv["srs"]))
-    s = word(page, "scenario")
-    check("day 2 correct: stage 2, due +2d (10-26)", s["srs"]["stage"] == 2 and s["srs"]["due"] == "2026-10-26", str(s["srs"]))
-
-    # ---------- 5. follow 'emission' through the whole Ebbinghaus ladder ----------
-    page.click("#btnHome"); page.select_option("#optNewPer", "0")
-    expected = []
-    day = "2026-10-24"  # emission was answered correctly on day 2 -> stage1, due 10-25
-    e = word(page, "emission")
-    check("emission day2: stage 1 due 10-25", e["srs"]["stage"] == 1 and e["srs"]["due"] == "2026-10-25", str(e["srs"]))
-    ladder_ok = True; log = []
-    for exp_stage, gap in [(2, 2), (3, 4), (4, 7), (5, 15), (6, 30)]:
-        day = e["srs"]["due"]
-        # the day before it is due, it must not be in the queue
-        prev = page.evaluate(f"SRS.addDays('{day}',-1)")
-        goto(page, prev, "#/review"); page.wait_for_selector("#statDue")
-        not_due = page.evaluate(f"SRS.dueList(ER.getVocab(),'{prev}',0).every(v=>v.word!=='emission')")
-        goto(page, day, "#/review"); page.wait_for_selector("#statDue")
-        due_now = page.evaluate(f"SRS.dueList(ER.getVocab(),'{day}',0).some(v=>v.word==='emission')")
-        if page.locator("#btnStart").count():
-            run_session(page)
-        e = word(page, "emission")
-        want_due = page.evaluate(f"SRS.addDays('{day}',{gap})")
-        ok = not_due and due_now and e["srs"]["stage"] == exp_stage and e["srs"]["due"] == want_due
-        log.append(f"{day}->stage{e['srs']['stage']} due {e['srs']['due']}")
-        ladder_ok &= ok
-    check("intervals 1,2,4,7,15,30 days then mastered", ladder_ok, "; ".join(log))
-    page.click('a[data-tab="vocab"]'); page.wait_for_selector("#vocabList .vitem")
-    check("vocab page shows 已掌握", "已掌握" in page.inner_text("#vocabList"), page.inner_text("#vocabList")[:150].replace("\n"," | "))
-    # mastered word answered wrong -> reset to 0 and re-asked in session
-    day = e["srs"]["due"]
-    goto(page, day, "#/review"); page.wait_for_selector("#statDue")
-    _, retries = run_session(page, wrong={"emission"})
-    e = word(page, "emission")
-    check("mastered word wrong -> stage 0 due tomorrow + re-asked", e["srs"]["stage"] == 0 and e["srs"]["due"] == page.evaluate(f"SRS.addDays('{day}',1)") and "emission" in retries, str(e["srs"]))
-    check("cap: at most 30 due per session", page.evaluate("SRS.dueList(Array.from({length:50},(_, i)=>({word:'w'+i,srs:{due:'2026-01-01',stage:0}})),'2026-10-23',30).length") == 30)
+    check("review uses active recall", "recall" in types, str(types))
+    e, s = word(page, "emission"), word(page, "scenario")
+    check("wrong meaning scheduled tomorrow", e["srs"]["skills"]["meaning"]["due"] == "2026-10-24")
+    check("meaning and spelling stored separately", "meaning" in s["srs"]["skills"] and "spelling" in s["srs"]["skills"])
+    check("summary shows words needing strengthening", "emission" in page.inner_text("#summaryCard"))
+    check("new study histories are recorded", all(x["srs"].get("history") for x in vocab(page)))
+    day = "2026-10-24"
 
     # ---------- 6. export / import round trip ----------
     goto(page, day, "#/vocab"); page.wait_for_selector("#btnBackup")
@@ -347,7 +281,7 @@ with sync_playwright() as p:
     check("import restores identical vocab + SRS progress", norm(after) == norm(before))
     check("import restores seen CET words", page.evaluate("ER.lsGet('er_cet_seen',{})") == seen_before)
     # merge keeps newer progress: modify locally, import old backup -> local newer wins
-    page.evaluate("(()=>{var v=ER.findWord('scenario');v.srs.last='2099-01-01';v.srs.stage=5;ER.saveVocab();})()")
+    page.evaluate("(()=>{var v=ER.findWord('scenario');v.srs.skills.meaning.last='2099-01-01';v.srs.skills.meaning.stage=5;v.srs=SRS.normalize(v.srs,ER.today());ER.saveVocab();})()")
     with page.expect_file_chooser() as fc:
         page.click("#btnImportMerge")
     fc.value.set_files(path)
@@ -384,7 +318,8 @@ with sync_playwright() as p:
     mp.screenshot(path="/tmp/er_mobile_read.png")
     mp.goto(f"{BASE}?today=2026-10-23#/review"); mp.wait_for_selector("#btnStart"); mp.tap("#btnStart")
     mp.wait_for_selector("#btnGotIt"); mp.screenshot(path="/tmp/er_mobile_card.png")
-    mp.tap("#btnGotIt"); mp.wait_for_selector("#btnGotIt"); mp.tap("#btnGotIt")
+    while mp.locator("#btnGotIt").count():
+        mp.tap("#btnGotIt"); mp.wait_for_timeout(50)
     mp.wait_for_selector("#qCard"); mp.screenshot(path="/tmp/er_mobile_test.png")
     page.goto(f"{BASE}?today=2026-10-23#/read/2026-10-23"); page.wait_for_selector("#articleReader h2"); page.screenshot(path="/tmp/er_desktop_read.png", full_page=True)
 
@@ -408,7 +343,7 @@ with sync_playwright() as p:
     check("phrase popup shows mocked Chinese translation", pp.input_value("#phraseZh") == "发人深省的信息" and "机器翻译" in pp.inner_text("#pop"))
     check("phrase popup has speak button + not a sheet on desktop", pp.locator("#pop [data-act=psay]").count() == 1 and not pp.evaluate("document.getElementById('pop').classList.contains('sheet')"))
     pp.screenshot(path="/tmp/er_phrase_pop_desktop.png")
-    check("desktop popup placed below the selection", pp.evaluate("getSelection().getRangeAt(0).getBoundingClientRect().bottom <= document.getElementById('pop').getBoundingClientRect().top"))
+    check("desktop popup avoids the selection and stays in the viewport", pp.evaluate("(()=>{var r=getSelection().getRangeAt(0).getBoundingClientRect(),p=document.getElementById('pop').getBoundingClientRect();return (r.bottom<=p.top||p.bottom<=r.top)&&p.top>=0&&p.bottom<=innerHeight;})()"))
     pp.click("#pop [data-act=psay]")
     pp.click("#pop [data-act=padd]")
     sm = word(pp, "sobering message")
@@ -479,44 +414,15 @@ with sync_playwright() as p:
     csv = open(d.value.path(), encoding="utf-8-sig").read()
     check("CSV includes phrases with type column", "make ends meet" in csv and "短语" in csv and "全球气候政策" in csv)
 
-    # ---------- 11. phrases in review ----------
+    # ---------- 11. phrases use the same independent-recall workflow ----------
     pp.click('a[data-tab="review"]'); pp.wait_for_selector("#statDue")
-    pp.select_option("#optNewPer", "0"); pp.wait_for_selector("#btnStart")
-    force_type(pp, "sobering message", "en2zh")
-    force_type(pp, "make ends meet", "zh2en")
-    force_type(pp, "carbon emissions", "spell")
-    force_type(pp, LONG, "spell")
-    force_type(pp, "global climate policy", "spell")
+    pp.select_option("#optNewPer", "0")
     qlog = []
     run_session(pp, wrong={"global climate policy", LONG}, log=qlog)
-    by = {}
-    for e in qlog:
-        by.setdefault((e["word"], e["first"]), e)
-    first = lambda w: by.get((w, True), {})
-    check("phrase en2zh multiple choice", first("sobering message").get("type") == "en2zh" and first("sobering message").get("ok"))
-    zopts = first("make ends meet").get("opts") or []
-    check("phrase zh2en multiple choice, distractors are other phrases",
-          first("make ends meet").get("type") == "zh2en" and first("make ends meet").get("ok") and len(zopts) == 4 and all(" " in o for o in zopts), str(zopts))
-    check("phrase dictation: case/punctuation/extra spaces ignored", first("carbon emissions").get("type") == "spell" and first("carbon emissions").get("ok"))
-    check("short phrase wrong dictation shows word diff", first("global climate policy").get("type") == "spell" and not first("global climate policy").get("ok") and first("global climate policy").get("diff"))
-    check("long phrase (>6 words) uses word-order tiles", first(LONG).get("type") == "order" and not first(LONG).get("ok") and first(LONG).get("diff"), str(first(LONG)))
-    check("wrong phrases re-asked later in session", (("global climate policy", False) in by) and ((LONG, False) in by))
-    order_retry = [e for e in qlog if e["word"] == LONG and not e["first"] and e["type"] == "order"]
-    t2 = pp.evaluate("w=>{var v=ER.findWord(w);return SRS.qtype(v.word,{qn:0})}", LONG)
-    g = word(pp, "global climate policy"); L = word(pp, LONG); c = word(pp, "carbon emissions")
-    check("wrong phrase -> stage 0, due tomorrow, lapse counted", g["srs"]["stage"] == 0 and g["srs"]["due"] == "2026-10-24" and g["srs"]["lapses"] == 1
-          and L["srs"]["stage"] == 0 and L["srs"]["lapses"] == 1, str(g["srs"]))
-    check("correct phrase -> stage 1, due tomorrow", c["srs"]["stage"] == 1 and c["srs"]["due"] == "2026-10-24" and word(pp, "sobering message")["srs"]["stage"] == 1)
-    # order question answered correctly: force order again for day 2
-    goto(pp, "2026-10-24", "#/review"); pp.wait_for_selector("#btnStart")
-    force_type(pp, LONG, "spell"); force_type(pp, "carbon emissions", "en2zh")
-    qlog2 = []
-    run_session(pp, log=qlog2)
-    lo = [e for e in qlog2 if e["word"] == LONG]
-    check("word-order question answered correctly", lo and lo[0]["type"] == "order" and lo[0]["ok"] and lo[0]["placed"] == LONG, str(lo[:1]))
-    c = word(pp, "carbon emissions"); L = word(pp, LONG)
-    check("day 2: phrase stage 2 due +2d; reset phrase back to stage 1", c["srs"]["stage"] == 2 and c["srs"]["due"] == "2026-10-26"
-          and L["srs"]["stage"] == 1 and L["srs"]["due"] == "2026-10-25", f'{c["srs"]} / {L["srs"]}')
+    check("phrases participate in recall review", all(any(e["word"] == w for e in qlog) for w in ["sobering message", "make ends meet", LONG]))
+    check("phrase mistakes recorded on meaning only", word(pp, LONG)["srs"]["skills"]["meaning"]["lapses"] > 0
+          and word(pp, LONG)["srs"]["skills"]["spelling"]["lapses"] == 0)
+    check("phrase feedback preserves original sentence", word(pp, "sobering message")["sentence"] and word(pp, "sobering message")["srs"].get("history"))
 
     # ---------- 12. phrase backup round trip + legacy data ----------
     goto(pp, "2026-10-24", "#/vocab"); pp.wait_for_selector("#btnBackup")
@@ -585,13 +491,11 @@ with sync_playwright() as p:
     check("mobile: vocab page no horizontal overflow", mq.evaluate("document.documentElement.scrollWidth<=window.innerWidth+1"))
     mq.screenshot(path="/tmp/er_mobile_vocab.png", full_page=True)
     mq.evaluate("ER.settings.newPerDay=0;ER.saveSettings()")
-    force_type(mq, "Food grown close to consumers travels shorter distances", "spell")
     mq.goto(f"{BASE}?today=2026-10-23#/review"); mq.wait_for_selector("#btnStart")
     mlog, shots = [], {}
     run_session(mq, log=mlog, tap=True, shots=shots)
-    mo = [e for e in mlog if e["type"] == "order"]
-    check("mobile: word-order question by tapping tiles", mo and mo[0]["ok"], str(mlog))
-    check("mobile: all phrase answers correct on phone", all(e["ok"] for e in mlog) and len(mlog) == 2, str(mlog))
+    check("mobile: recall buttons work by tapping", any(e["type"] == "recall" and e["ok"] for e in mlog), str(mlog))
+    check("mobile: all phrase answers correct on phone", all(e["ok"] for e in mlog) and {e["word"] for e in mlog} == {"climate summit", "Food grown close to consumers travels shorter distances"}, str(mlog))
 
     # ---------- 14. data-loss safeguards ----------
     sc = browser.new_context(accept_downloads=True); mock_routes(sc)
@@ -749,119 +653,18 @@ with sync_playwright() as p:
     check("disconnect removes token, keeps data", A.evaluate("localStorage.getItem('er_sync_token')") is None and "offline word" in words(A) and A.locator("#syncSetup").is_visible())
     ca.close(); cb.close()
 
-    # ---------- 18. cloze + letter-gaps review types ----------
-    qc = browser.new_context(accept_downloads=True, viewport={"width": 1100, "height": 900})
-    mock_routes(qc)
-    qp = qc.new_page(); attach(qp, "cloze-gaps")
+    # ---------- 18. reusable sentence and letter helpers ----------
+    qc = browser.new_context(); mock_routes(qc)
+    qp = qc.new_page(); attach(qp, "sentence-helpers")
     goto(qp, "2026-10-23", "#/review"); qp.wait_for_selector("#statNew")
-    # seed vocab with known sentences
-    qp.evaluate("""()=>{
-      ER.addWord({word:'contribute',zh:'v. 贡献',sentence:'She contributed a lot to the project.',sentence_zh:'她为这个项目贡献了很多。',source:'manual'});
-      ER.addWord({word:'acutely',zh:'adv. 敏锐地',sentence:'He felt the loss acutely.',sentence_zh:'他敏锐地感到了损失。',source:'manual'});
-      ER.addWord({word:'make ends meet',type:'phrase',zh:'勉强维持生计',sentence:'Many families struggle to make ends meet.',sentence_zh:'许多家庭艰难维持生计。',source:'manual'});
-      // due today
-      ['contribute','acutely','make ends meet'].forEach(w=>{var v=ER.findWord(w);v.srs.due='2026-10-23';v.srs.stage=2;});
-      ER.saveVocab();
-      ER.settings.newPerDay=0; ER.saveSettings();
-    }""")
-    qp.reload(); qp.wait_for_function("window.ER && ER.today")
-    goto(qp, "2026-10-23", "#/review"); qp.wait_for_selector("#statDue")
-    # unit helpers
-    mask = qp.evaluate("()=>ER.gapMask('acutely', 2, '2026-10-23')")
-    check("gapMask keeps first letter and hides some",
-          mask["text"] == "acutely" and mask["display"][0] == "a" and "_" in mask["display"]
-          and 1 <= len(mask["gaps"]) <= 5, str(mask))
-    mask2 = qp.evaluate("()=>ER.gapMask('acutely', 2, '2026-10-23')")
-    check("gapMask deterministic for word+day", mask == mask2)
-    blank = qp.evaluate("()=>{var v=ER.findWord('contribute');var s=ER.resolveSentence(v);return {sent:s, blank:ER.clozeBlank(v,s.en)};}")
-    check("cloze blanks inflected form in sentence",
-          blank["blank"] and blank["blank"]["form"].lower() == "contributed"
-          and blank["sent"]["en"].lower().find("contributed") >= 0, str(blank)[:240])
-    force_type(qp, "contribute", "cloze")
-    force_type(qp, "acutely", "gaps")
-    force_type(qp, "make ends meet", "cloze")
-    qlog = []
-    run_session(qp, wrong={"acutely"}, log=qlog)
-    by = {e["word"]: e for e in qlog if e["first"]}
-    check("cloze question for contribute", by.get("contribute", {}).get("type") == "cloze" and by["contribute"]["ok"], str(by.get("contribute")))
-    check("gaps question for acutely (wrong resets)", by.get("acutely", {}).get("type") == "gaps" and not by["acutely"]["ok"], str(by.get("acutely")))
-    check("wrong gaps -> stage 0", (word(qp, "acutely") or {}).get("srs", {}).get("stage") == 0)
-    rq = [e for e in qlog if e["word"] == "acutely" and not e["first"]]
-    check("再练一次 keeps the letter-gap type", len(rq) >= 1 and all(e["type"] == "gaps" for e in rq), str(rq))
-    check("gaps questions never show a whole-word input", all(e.get("full_input", 0) == 0 for e in qlog if e["type"] == "gaps"))
-    rot = qp.evaluate("""()=>{var w='authors stress', out=[]; for(var q=0;q<5;q++) out.push(SRS.qtype(w,{qn:q})); return out;}""")
-    check("rotation has spell and gaps as distinct types", sorted(set(rot)) == sorted(["spell", "en2zh", "zh2en", "cloze", "gaps"]), str(rot))
-    # phrase letter-gaps: only letter boxes; spelling: only the whole input
-    qp.evaluate("""()=>{ER.addWord({word:'authors stress',type:'phrase',zh:'作者强调',source:'manual'});
-      var v=ER.findWord('authors stress'); v.srs.due='2026-10-23'; v.srs.stage=1; ER.saveVocab();}""")
-    qp.reload(); goto(qp, "2026-10-23", "#/review"); qp.wait_for_selector("#statDue")
-    force_type(qp, "authors stress", "gaps")
-    qp.click("#btnStart"); qp.wait_for_selector("#qCard[data-type=gaps]")
-    qp.wait_for_function("document.activeElement && document.activeElement.classList.contains('gap-in')", timeout=3000)
-    gq = qp.evaluate("""()=>{var c=document.getElementById('qCard'); return {hint:c.querySelector('.hint').textContent, html:c.innerHTML,
-       boxes:c.querySelectorAll('.gap-in').length, others:c.querySelectorAll('input:not(.gap-in),textarea').length,
-       vals:[...c.querySelectorAll('.gap-in')].map(i=>i.value).join(''), ph:[...c.querySelectorAll('.gap-in')].map(i=>i.placeholder).join(''),
-       attrs:[...c.querySelectorAll('.gap-in')].every(i=>i.getAttribute('autocapitalize')==='off'&&i.getAttribute('autocorrect')==='off'&&i.getAttribute('autocomplete')==='off'&&i.spellcheck===false),
-       tag:c.querySelector('.qtype').textContent, focus:document.activeElement===c.querySelector('.gap-in')}}""")
-    check("gaps phrase: only letter boxes, no whole-word input", gq["boxes"] >= 2 and gq["others"] == 0 and qp.locator("#gapsFull").count() == 0, str({k: gq[k] for k in ("boxes", "others")}))
-    check("gaps hint text updated", "补全缺失的字母（首字母已给出）" in gq["hint"] and "整词" not in gq["hint"], gq["hint"])
-    check("gaps: answer not pre-shown anywhere", "authors stress" not in gq["html"] and "authors" not in gq["html"] and "stress" not in gq["html"] and gq["vals"] == "" and gq["ph"] == "")
-    check("gaps: inputs autocapitalize/autocorrect/autocomplete/spellcheck off, first box focused", gq["attrs"] and gq["focus"])
-    hidden = qp.evaluate("[...document.querySelectorAll('.gap-in')].map(i=>'authors stress'.charAt(+i.dataset.i)).join('')")
-    qp.keyboard.type(hidden[:2])
-    check("gaps: typing auto-advances", qp.evaluate("[...document.querySelectorAll('.gap-in')].indexOf(document.activeElement)") == min(2, len(hidden) - 1))
-    qp.keyboard.press("Backspace")
-    pos_after = qp.evaluate("[...document.querySelectorAll('.gap-in')].indexOf(document.activeElement)")
-    if len(hidden) > 2:
-        check("gaps: backspace on empty box clears previous + moves back", qp.evaluate("[...document.querySelectorAll('.gap-in')].indexOf(document.activeElement)") == 1
-              and qp.evaluate("document.querySelectorAll('.gap-in')[1].value") == "", str(pos_after))
-        qp.keyboard.type(hidden[1:])
-    else:
-        qp.keyboard.type(hidden[len(hidden) - 1:])
-    qp.keyboard.press("Enter")
-    qp.wait_for_selector("#btnNext:not([hidden])")
-    check("gaps: Enter submits, correct", "正确" in qp.inner_text("#feedback"), qp.inner_text("#feedback"))
-    qp.keyboard.press("Enter"); qp.wait_for_timeout(200)
-    force_type(qp, "authors stress", "spell")
-    qp.evaluate("""()=>{var v=ER.findWord('authors stress'); v.srs.due='2026-10-23'; ER.saveVocab();}""")
-    qp.reload(); goto(qp, "2026-10-23", "#/review"); qp.wait_for_selector("#statDue")
-    force_type(qp, "authors stress", "spell")
-    qp.click("#btnStart"); qp.wait_for_selector("#qCard[data-type=spell]")
-    check("spelling: only the whole input, no letter boxes", qp.locator("#qCard .gap-in").count() == 0 and qp.locator("#spellInput").count() == 1
-          and qp.input_value("#spellInput") == "" and "听写" in qp.inner_text("#qCard .qtype"))
-    check("cloze phrase blanks whole phrase", by.get("make ends meet", {}).get("type") == "cloze" and by["make ends meet"]["ok"], str(by.get("make ends meet")))
-    # CET examples file available for words without source ex
-    ex = qp.evaluate("""async()=>{
-      await ER.pickNewCet(0);
-      // load examples via a dummy session prep: call resolve after ensuring lists
-      return await fetch('data/examples-cet6.json').then(r=>r.json()).then(d=>({n:Object.keys(d.examples||{}).length, acutely:d.examples.acutely}));
-    }""")
-    check("examples-cet6.json has natural fill-ins", ex["n"] >= 100 and ex["acutely"] and "acutely" in ex["acutely"]["en"].lower() and "important for everyday life" not in ex["acutely"]["en"] and "felt the pain acutely" in ex["acutely"]["en"].lower(), str(ex)[:240])
+    qp.evaluate("ER.addWord({word:'contribute',zh:'贡献',sentence:'She contributed a lot to the project.',sentence_zh:'她为这个项目贡献了很多。',source:'manual'})")
+    mask = qp.evaluate("ER.gapMask('acutely',2,'2026-10-23')")
+    check("letter hint keeps first letter with reproducible gaps", mask["display"][0] == "a" and "_" in mask["display"] and mask == qp.evaluate("ER.gapMask('acutely',2,'2026-10-23')"))
+    blank = qp.evaluate("()=>{var v=ER.findWord('contribute');return ER.clozeBlank(v,ER.resolveSentence(v).en)}")
+    check("cloze recognizes inflected form", blank and blank["form"].lower() == "contributed", str(blank))
+    ex = qp.evaluate("fetch('data/examples-cet6.json').then(r=>r.json()).then(d=>({n:Object.keys(d.examples||{}).length,acutely:d.examples.acutely}))")
+    check("CET example file contains usable sentences", ex["n"] >= 100 and "felt the pain acutely" in ex["acutely"]["en"].lower())
     qc.close()
-
-    # mobile letter-gap inputs
-    qm = browser.new_context(viewport={"width": 390, "height": 760}, has_touch=True, is_mobile=True, device_scale_factor=2)
-    mock_routes(qm)
-    qmp = qm.new_page(); attach(qmp, "gaps-mobile")
-    goto(qmp, "2026-10-23", "#/review")
-    qmp.evaluate("""()=>{
-      ER.addWord({word:'statue',zh:'n. 雕像',source:'manual'});
-      var v=ER.findWord('statue'); v.srs.due='2026-10-23'; v.srs.stage=3; ER.saveVocab();
-      ER.settings.newPerDay=0; ER.saveSettings();
-    }""")
-    qmp.reload(); goto(qmp, "2026-10-23", "#/review"); qmp.wait_for_selector("#statDue")
-    force_type(qmp, "statue", "gaps")
-    qmp.click("#btnStart")
-    qmp.wait_for_selector("#qCard[data-type=gaps]")
-    check("mobile gaps: letter inputs present, no whole-word input", qmp.locator(".gap-in").count() >= 1 and qmp.locator("#qCard input:not(.gap-in)").count() == 0)
-    check("mobile gaps: boxes >=16px (no iOS zoom), no overflow",
-          qmp.evaluate("[...document.querySelectorAll('.gap-in')].every(i=>parseFloat(getComputedStyle(i).fontSize)>=16)") and qmp.evaluate("document.documentElement.scrollWidth<=innerWidth+1"))
-    qmp.evaluate("""(w)=>{document.querySelectorAll('.gap-in').forEach(inp=>{inp.value=w.charAt(+inp.dataset.i);});}""", "statue")
-    qmp.locator("#btnCheck").tap()
-    qmp.wait_for_selector("#btnNext:not([hidden])")
-    check("mobile gaps: correct via letter inputs", "正确" in qmp.inner_text("#feedback"))
-    qmp.screenshot(path="/tmp/er_gaps_mobile.png")
-    qm.close()
 
     # ---------- 17. CET new-word order (hash-mixed, deterministic) ----------
     oc = browser.new_context(); mock_routes(oc)

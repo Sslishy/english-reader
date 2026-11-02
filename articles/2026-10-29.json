@@ -175,5 +175,64 @@
       "text": "cutting emissions",
       "meaning_zh": "减少排放；减排"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "How should ocean-based technologies be used, according to the passage?",
+      "options": [
+        "As a replacement for all emissions cuts.",
+        "Alongside emissions cuts and protection of nature.",
+        "Only after abandoning monitoring.",
+        "To remove the need for climate policy."
+      ],
+      "answer": 1,
+      "explanation": "complement rather than replace 是关键：补充既有行动，而非替代。",
+      "evidence": [
+        {
+          "paragraph": 5,
+          "quote": "should complement, rather than replace, cutting emissions and protecting nature"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Which technology is described as the most mature and urgently needed?",
+      "options": [
+        "Marine carbon dioxide removal.",
+        "Artificial islands.",
+        "Ocean monitoring.",
+        "Deep-sea tourism."
+      ],
+      "answer": 2,
+      "explanation": "原文比较三类技术，最成熟且最急需的是海洋监测。",
+      "evidence": [
+        {
+          "paragraph": 4,
+          "quote": "ocean monitoring, such as sensors, observation systems and computer models, which is the most mature and the most urgently needed"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "How can a weaker ocean carbon sink intensify warming?",
+      "options": [
+        "More carbon dioxide remains in the atmosphere.",
+        "It immediately eliminates all greenhouse gases.",
+        "It stops sea temperatures from rising.",
+        "It increases the amount of carbon stored on every coast."
+      ],
+      "answer": 0,
+      "explanation": "吸收碳的能力变弱，更多二氧化碳留在大气中，进一步加剧变暖，形成反馈。",
+      "evidence": [
+        {
+          "paragraph": 1,
+          "quote": "more carbon dioxide stays in the atmosphere, which in turn causes further warming"
+        }
+      ]
+    }
   ]
 }

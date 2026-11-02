@@ -192,6 +192,7 @@ ER.practiceBox = function(a,i){
     '<span class="tp-st hint" id="tpSt'+i+'" aria-live="polite">'+statusFor(e)+'</span></div>'+
     '<div class="tp-err err" id="tpErr'+i+'" hidden></div>'+
     '<div class="tp-fb" id="tpFb'+i+'"'+(e.fb?'':' hidden')+'>'+fbHtml(e)+'</div>'+
+    '<div id="tpDrill'+i+'">'+(ER.translationDrillControls?ER.translationDrillControls(a,i,e):'')+'</div>'+
   '</div>';
 };
 function statusFor(e){
@@ -231,7 +232,7 @@ function refreshOpen(){
   Array.prototype.forEach.call(document.querySelectorAll('#articleReader .tp'), function(box){
     var i=+box.dataset.i, e=entry(a.date,i)||{}, ta=$('tpIn'+i);
     if(ta && document.activeElement!==ta && ta.value!==(e.text||'')){ ta.value=e.text||''; grow(ta); }
-    if(!busy[idOf(a.date,i)]){ var fb=$('tpFb'+i); fb.innerHTML=fbHtml(e); fb.hidden=!e.fb; }
+    if(!busy[idOf(a.date,i)]){ var fb=$('tpFb'+i); fb.innerHTML=fbHtml(e); fb.hidden=!e.fb; if(ER.renderTranslationDrillControls)ER.renderTranslationDrillControls(a,i,e); }
     var b=document.querySelector('#articleReader .tp-btn[data-tp="'+i+'"]'); if(b) b.classList.toggle('has', !!(e.text||e.fb));
   });
 }
@@ -260,6 +261,7 @@ function submit(i){
   if(!getKey()){ err.hidden=false; err.innerHTML=esc(errText({noKey:true}))+' <button type="button" data-tpsettings="1">打开设置</button>'; return; }
   if(busy[id]) return;
   clearTimeout(saveTimers[i]); update(a.date,i,{text:ta.value});
+  var submittedText=ta.value;
   var en=a.paragraphs[i], ref=(Array.isArray(a.paragraphs_zh)&&a.paragraphs_zh.length===a.paragraphs.length)?a.paragraphs_zh[i]:'';
   var ctl=('AbortController' in window)?new AbortController():{abort:function(){},signal:undefined};
   busy[id]=ctl; send.disabled=true; send.textContent='批改中…'; stop.hidden=false;
@@ -271,8 +273,10 @@ function submit(i){
     raf(function(){ if(pending!=null&&busy[id]===ctl){ mdBox.innerHTML=md(pending); pending=null; } });
   }, ctl).then(function(res){
     delete busy[id];
-    var e=update(a.date,i,{fb:res.text, fbFor:ta.value, fbAt:Date.now(), truncated:res.truncated});
+    var e=update(a.date,i,{fb:res.text, fbFor:submittedText, fbAt:Date.now(), truncated:res.truncated});
     fb.innerHTML=fbHtml(e); st.textContent='已批改 · 草稿和批改都已保存';
+    if(ER.captureTranslationMistakes){var added=ER.captureTranslationMistakes(a,i,res.text);if(added.added)st.textContent+=' · '+added.added+' 项错题已排到明天';}
+    if(ER.renderTranslationDrillControls)ER.renderTranslationDrillControls(a,i,e);
   }, function(e){
     delete busy[id];
     var old=entry(a.date,i)||{};

@@ -48,7 +48,7 @@ var today = ER.today = function(){ return fakeToday || realToday(); };
 ER.setToday = function(d){ fakeToday = d && SRS.isYmd(d) ? d : null; updateBadge(); };
 
 /* ========== 设置 ========== */
-var settings = ER.settings = Object.assign({accent:'en-US',auto:false,size:'20',email:'',text:'',newPerDay:10,cet6:false}, lsGet('er_settings',{}));
+var settings = ER.settings = Object.assign({accent:'en-US',auto:false,size:'20',email:'',text:'',newPerDay:5,cet6:false,reviewMode:'reading'}, lsGet('er_settings',{}));
 function settingsSig(){ var o=Object.assign({},settings); delete o.text; return JSON.stringify(o); }
 var lastSettingsSig = settingsSig();
 var saveSettings = ER.saveSettings = function(noStamp){
@@ -189,10 +189,30 @@ ER.addWord = function(item){
   vocab.push(v); saveVocab(); return v;
 };
 ER.removeWord = function(w){ var tb={}; tb[keyOf(w)]=Date.now(); vocab=vocab.filter(function(v){return v.word!==w;}); allowEmptyOnce=true; saveVocab({tombs:tb}); };
+/* 用户主动恢复旧版「我认识」的词：保留词条并安排抽查，不再永久排除。
+ * restoredAt 必须晚于删除墓碑，远端仍有旧墓碑时也不会再次删除。 */
+ER.restoreKnownWords = function(entries){
+  var seen=lsGet('er_cet_seen',{}), tombs=getTombs(), restored=[], t=today();
+  (Array.isArray(entries)?entries:[]).forEach(function(x){
+    if(!x||typeof x.word!=='string') return;
+    var word=x.word.trim(), sk=word.toLowerCase(), k=keyOf(word);
+    if(!k||seen[sk]!=='known'||ER.findWord(word)) return;
+    var v=fixType({word:word,forms:[],phonetic:x.phonetic||'',zh:x.zh||'',en:x.en||'',
+      sentence:x.ex||x.sentence||'',sentence_zh:x.exzh||x.sentence_zh||'',date:t,audio:x.audio||'',
+      source:x.level||x.source||'cet4',srs:SRS.markKnown(SRS.init(t),t),
+      updatedAt:Math.max(Date.now(),(+tombs[k]||0)+1)});
+    vocab.push(v); restored.push(sk); seen[sk]='learn';
+  });
+  if(!restored.length) return 0;
+  if(!saveVocab()) return 0;
+  lsSet('er_cet_seen',seen);
+  if(ER.syncSoon) ER.syncSoon();
+  return restored.length;
+};
 function inVocab(word){return !!ER.findWord(word);}
 function updateCount(){$('vocabCount').textContent=vocab.length;$('vocabCount2').textContent='（'+vocab.length+' 个）';}
 var updateBadge = ER.updateBadge = function(){
-  var n=vocab.filter(function(v){return SRS.isDue(v.srs,today());}).length;
+  var n=vocab.filter(function(v){return SRS.isDue(v.srs,today(),settings.reviewMode==='balanced');}).length;
   var b=$('dueBadge'); b.textContent=n; b.hidden=!n; b.title='今天有 '+n+' 个词待复习';
 };
 function vocabKeys(){var s={};vocab.forEach(function(v){s[v.word.toLowerCase()]=1;(v.forms||[]).forEach(function(f){s[f]=1;});});return s;}
@@ -274,6 +294,7 @@ var articleIndex = null, currentArticle = null;
 function loadIndex(){
   return fetchJson('articles/index.json?'+Date.now(),15000).then(function(d){articleIndex=Array.isArray(d)?d:[];return articleIndex;});
 }
+ER.getArticleIndex=function(){return articleIndex?Promise.resolve(articleIndex):loadIndex();};
 function showArticle(date){
   var box=$('articleBox');
   var p = articleIndex? Promise.resolve(articleIndex) : loadIndex();
@@ -294,6 +315,7 @@ function renderArticle(a, isNewest){
   var h='<div class="card">', zh=paraZh(a), shown=zhState(a);
   h+='<div class="art-meta"><span class="tag">'+(isNewest?'今日阅读':'往期')+' · '+esc(a.date)+'</span><span class="tag">'+esc(a.level||'')+'</span><span>'+wordCount(a)+' 词</span>'+
      (zh?'<button type="button" id="btnZhAll" class="zh-all" aria-pressed="false" title="显示 / 隐藏全部段落的中文译文（也可以点每段末尾的「译」只看一段）">全文对照</button>':'')+'</div>';
+  h+='<div id="listenPanel"></div>';
   h+='<article class="reader" id="articleReader"><h2>'+tokenize(a.title)+'</h2>';
   h+='<div class="art-title-zh">'+esc(a.title_zh||'')+'</div>';
   h+='<details class="summary"><summary>中文导读（建议读完英文后再看）</summary><div style="margin-top:6px;font-family:-apple-system,\'PingFang SC\',sans-serif;font-size:15px;line-height:1.7">'+esc(a.summary_zh||'')+'</div></details>';
@@ -308,6 +330,7 @@ function renderArticle(a, isNewest){
   h+='</article>';
   h+='<p class="hint">来源：<a href="'+esc(a.source_url)+'" target="_blank" rel="noopener">'+esc(a.source_name||a.source_url)+'</a>（本文为根据该报道改写的原创学习文章）</p>';
   h+='<p class="hint">'+READ_HINT+(zh?' · 点段末「译」或上方「全文对照」看整段中文译文（AI 逐段精译，建议先自己读懂再对照）':'')+' · 点「我来翻译」自己译这一段，提交后由 DeepSeek AI 批改'+'</p></div>';
+  if(ER.learningArticleHtml) h+=ER.learningArticleHtml(a);
   if(a.key_words&&a.key_words.length){
     h+='<div class="card"><h3 class="card-title">🔑 重点词汇</h3><div class="kw-list">';
     a.key_words.forEach(function(k){
@@ -322,6 +345,7 @@ function renderArticle(a, isNewest){
   syncZhAll();
   refreshHighlights();
   if(ER.practiceAfterRender) ER.practiceAfterRender();
+  if(ER.learningAfterRender) ER.learningAfterRender(a);
 }
 /* ========== 整段中文译文（paragraphs_zh，可选） ========== */
 var ZH_KEY='er_para_zh';   // 记住「全文对照」开关：true = 默认显示全部译文
@@ -417,16 +441,24 @@ var hideZh=false;
 $('btnHideZh').onclick=function(){hideZh=!hideZh;this.textContent=hideZh?'显示中文':'遮住中文';renderVocab();};
 function srsPill(v){
   var s=v.srs, t=today(); if(!s) return '';
-  if(s.stage>=SRS.MAX_STAGE && s.due>t) return '<span class="stage done">已掌握 · '+s.due.slice(5)+' 抽查</span>';
-  if(s.due<=t) return '<span class="stage due">'+SRS.stageLabel(s)+' · 今天复习</span>';
-  return '<span class="stage">'+SRS.stageLabel(s)+' · '+s.due.slice(5)+' 复习</span>';
+  var due=SRS.dueDate(s,settings.reviewMode==='balanced');
+  var stable=SRS.isMastered(s), label=stable?'词义已通过延迟验证':'词义阶段 '+s.stage+'/'+SRS.MAX_STAGE;
+  if(due<=t) return '<span class="stage due">'+esc(label)+' · 今天复习</span>';
+  return '<span class="stage'+(stable?' done':'')+'">'+esc(label)+' · '+esc(due.slice(5))+' 复习</span>';
+}
+function skillSummary(s){
+  var names={meaning:'词义',usage:'语境',spelling:'拼写'}, skills=s.skills||{};
+  return Object.keys(names).map(function(k){
+    var p=skills[k];
+    return names[k]+'：'+(!p||p.active===false?'尚未练习':'阶段 '+p.stage+'/'+SRS.MAX_STAGE);
+  }).join(' · ');
 }
 function renderVocab(){
   var q=$('vocabFilter').value.trim().toLowerCase();
   var list=vocab.slice();
   var sort=$('vocabSort').value, srcF=$('vocabSrc').value;
   if(sort==='new') list.reverse(); else if(sort==='az') list.sort(function(a,b){return a.word.localeCompare(b.word);});
-  else if(sort==='due') list.sort(function(a,b){return a.srs.due<b.srs.due?-1:a.srs.due>b.srs.due?1:0;});
+  else if(sort==='due') list.sort(function(a,b){var ad=SRS.dueDate(a.srs,settings.reviewMode==='balanced'),bd=SRS.dueDate(b.srs,settings.reviewMode==='balanced');return ad<bd?-1:ad>bd?1:0;});
   if(srcF==='reading') list=list.filter(function(v){return v.source==='reading';});
   else if(srcF==='cet') list=list.filter(function(v){return /^cet/.test(v.source);});
   else if(srcF==='manual') list=list.filter(function(v){return v.source==='manual';});
@@ -448,7 +480,8 @@ function renderVocab(){
       '<div class="vzh">'+esc(v.zh||'（无中文释义）')+'</div>'+
       (v.sentence?'<div class="vs">'+highlightIn(v.sentence,v)+'</div>':'')+
       (v.note?'<div class="vnote">📝 '+esc(v.note)+'</div>':'')+
-      '<div class="vd">'+esc(v.date||'')+' · 来源：'+srcTag+' · 已复习 '+(v.srs.reps||0)+' 次'+(v.srs.lapses?'，答错 '+v.srs.lapses+' 次':'')+'</div></div>';
+      '<div class="vd vskills">'+esc(skillSummary(v.srs))+'</div>'+
+      '<div class="vd">'+esc(v.date||'')+' · 来源：'+srcTag+' · 已作答 '+(v.srs.reps||0)+' 次'+(v.srs.lapses?'，需要重练 '+v.srs.lapses+' 次':'')+'</div></div>';
   }).join('');
 }
 ER.renderVocab = renderVocab;
@@ -530,7 +563,7 @@ $('manAdd').onclick=function(){
 ER.buildBackup = function(){
   var s=Object.assign({},settings); delete s.text;
   return {app:'english-reader',version:2,exportedAt:new Date().toISOString(),today:today(),
-    data:{vocab:vocab, cetSeen:lsGet('er_cet_seen',{}), daily:lsGet('er_daily',{}), settings:s, translations:ER.getTranslations?ER.getTranslations():{}}};
+    data:{vocab:vocab, cetSeen:lsGet('er_cet_seen',{}), daily:lsGet('er_daily',{}), settings:s, translations:ER.getTranslations?ER.getTranslations():{}, learning:ER.getLearningState?ER.getLearningState():{}}};
 };
 ER.applyBackup = function(b, mode){
   if(!b||b.app!=='english-reader'||!b.data||!Array.isArray(b.data.vocab)) throw new Error('不是有效的备份文件');
@@ -557,6 +590,7 @@ ER.applyBackup = function(b, mode){
   }
   lsSet('er_cet_seen',seen);
   if(b.data.translations&&ER.mergeTranslations) ER.mergeTranslations(b.data.translations);
+  if(b.data.learning&&ER.mergeLearningState)ER.mergeLearningState(b.data.learning,mode==='replace');
   saveVocab(applyOpt);
   return vocab.length;
 };
@@ -586,6 +620,7 @@ ER.syncState = function(){
   var st={app:'english-reader',format:1,vocab:vocab,tombstones:getTombs(),daily:lsGet('er_daily',{}),cetSeen:lsGet('er_cet_seen',{}),settings:s,settingsAt:+lsGet('er_settings_at',0)||0};
   // 翻译练习的草稿 + 批改（没有时不写这个字段，保持和旧数据完全一致）
   var tr=ER.getTranslations&&ER.getTranslations(); if(tr&&Object.keys(tr).length) st.translations=tr;
+  var learning=ER.getLearningState&&ER.getLearningState();if(learning&&Object.keys(learning).length)st.learning=learning;
   return st;
 };
 /* 把远端数据并入本机（只增不丢），返回合并后的整份数据 */
@@ -597,6 +632,7 @@ ER.mergeRemoteState = function(r){
   var d=mergeDaily(lsGet('er_daily',{}), r.daily); lsSet('er_daily',d,true);
   var seen=lsGet('er_cet_seen',{}); Object.keys(r.cetSeen||{}).forEach(function(k){ if(!seen[k]) seen[k]=r.cetSeen[k]; }); lsSet('er_cet_seen',seen,true);
   if(r.translations&&ER.mergeTranslations) ER.mergeTranslations(r.translations);
+  if(r.learning&&ER.mergeLearningState)ER.mergeLearningState(r.learning);
   var la=+lsGet('er_settings_at',0)||0;
   if(r.settings && (+r.settingsAt||0)>la){
     var keepText=settings.text; Object.assign(settings,r.settings); settings.text=keepText;
@@ -916,6 +952,7 @@ ER.lookup = lookup;
 /* ========== 发音 ========== */
 var audioEl=new Audio();
 var speak = ER.speak = function(word,audioUrl){
+  if(ER.stopLearningAudio)ER.stopLearningAudio();
   var fallbackUrl='https://dict.youdao.com/dictvoice?audio='+encodeURIComponent(word)+'&type='+(settings.accent==='en-GB'?1:2);
   var playUrl=function(u,onFail){
     try{ audioEl.pause(); audioEl.onerror=function(){onFail&&onFail();}; audioEl.src=u; var p=audioEl.play(); if(p&&p.catch) p.catch(function(){onFail&&onFail();}); }
@@ -957,6 +994,7 @@ function openFor(span){
   activeRange=null; pop.classList.remove('phrase'); document.body.classList.remove('sheet-open');
   activeSpan=span; span.classList.add('active');
   var raw=span.getAttribute('data-w');
+  if(ER.noteLearningLookup&&currentArticle&&span.closest('#articleReader'))ER.noteLearningLookup(currentArticle.date,raw);
   var sentEl=span.closest('.sent'); var sentence=sentEl?sentEl.textContent.replace(/\s+/g,' ').trim():'';
   var my=++reqId;
   pop.innerHTML='<button class="pop-close" aria-label="关闭">×</button><div class="pop-head"><span class="pop-word">'+esc(span.textContent)+'</span></div><p class="muted"><span class="spinner"></span>查询中…</p>';
@@ -1174,6 +1212,7 @@ function route(){
   ['read','review','vocab','paste'].forEach(function(t){ $('view-'+t).hidden = t!==tab; });
   Array.prototype.forEach.call(document.querySelectorAll('#tabs a'),function(a){a.classList.toggle('on',a.dataset.tab===tab);});
   ER.currentTab=tab;
+  if(ER.learningRoute)ER.learningRoute(tab);
   ER.views[tab].show(arg);
 }
 ER.start = function(){

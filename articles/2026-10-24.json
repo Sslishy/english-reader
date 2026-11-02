@@ -173,5 +173,64 @@
       "text": "food supplies",
       "meaning_zh": "粮食供应"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "What is SoilFER mainly trying to achieve?",
+      "options": [
+        "Replace farms with laboratories.",
+        "Sell the same fertilizer to every farmer.",
+        "Help farmers make decisions using information about their soil.",
+        "Move all farming into cities."
+      ],
+      "answer": 2,
+      "explanation": "主线是用土壤数据替代种植和施肥时的猜测。",
+      "evidence": [
+        {
+          "paragraph": 0,
+          "quote": "replace that guesswork with reliable data"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "How do farmers receive information about their own land?",
+      "options": [
+        "Only through printed textbooks.",
+        "Directly on their mobile phones.",
+        "By travelling to Japan.",
+        "Through compulsory university courses."
+      ],
+      "answer": 1,
+      "explanation": "文章直接说明，检测结果发送到农民手机。",
+      "evidence": [
+        {
+          "paragraph": 1,
+          "quote": "the findings are sent directly to their mobile phones"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "Why might training soil doctors benefit more than the trainees themselves?",
+      "options": [
+        "They replace every laboratory.",
+        "They decide global food prices.",
+        "They stop all climate shocks.",
+        "They share what they learn with neighbouring farmers."
+      ],
+      "answer": 3,
+      "explanation": "培训者把知识传给邻居，说明项目的影响可以扩展到未直接参加培训的人。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "they pass this knowledge on to their neighbours"
+        }
+      ]
+    }
   ]
 }

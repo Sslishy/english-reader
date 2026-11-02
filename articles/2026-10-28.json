@@ -173,5 +173,64 @@
       "text": "in return",
       "meaning_zh": "作为回报"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "What is the central concern of the passage?",
+      "options": [
+        "Domestic work is no longer needed.",
+        "Most domestic workers have exceptionally high pay.",
+        "The number of domestic workers has fallen to zero.",
+        "Essential domestic workers often lack fair pay and legal protection."
+      ],
+      "answer": 3,
+      "explanation": "文章从社会贡献展开，主要指出法律保障、报酬和工时方面的不平等。",
+      "evidence": [
+        {
+          "paragraph": 0,
+          "quote": "most of these domestic workers have almost no legal protection"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "What does informal employment often mean for these workers?",
+      "options": [
+        "Guaranteed pensions and paid leave.",
+        "No written contract, sick pay or pension.",
+        "Working only in government offices.",
+        "Receiving twice the average wage."
+      ],
+      "answer": 1,
+      "explanation": "非正规就业的后果在原文中具体列举。",
+      "evidence": [
+        {
+          "paragraph": 1,
+          "quote": "no written contract, no sick pay and no pension"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "Why is the unchanged 2.2% share of employment significant?",
+      "options": [
+        "It proves domestic work is disappearing.",
+        "It shows every new worker entered domestic work.",
+        "It suggests the increase largely followed overall employment growth.",
+        "It means informal employment has ended."
+      ],
+      "answer": 2,
+      "explanation": "总人数上升但占比基本不变，支持增长主要随总体就业增长这一解释。",
+      "evidence": [
+        {
+          "paragraph": 1,
+          "quote": "the rise simply reflects growth in overall employment"
+        }
+      ]
+    }
   ]
 }

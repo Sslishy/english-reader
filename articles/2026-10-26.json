@@ -175,5 +175,64 @@
       "text": "everyday life",
       "meaning_zh": "日常生活"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "What is the campaign trying to make normal in everyday life?",
+      "options": [
+        "Keeping broken devices forever.",
+        "Repairing, reusing and recycling electronics responsibly.",
+        "Buying a new phone every month.",
+        "Mixing electronic waste with food waste."
+      ],
+      "answer": 1,
+      "explanation": "长期目标明确包括维修、再利用和回收，而不仅是一次性的收集活动。",
+      "evidence": [
+        {
+          "paragraph": 5,
+          "quote": "the responsible repair, reuse and recycling of electronic goods a normal part of everyday life"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "Why was guidance shared in regional languages?",
+      "options": [
+        "To make the instructions easier to follow.",
+        "To exclude teachers from the campaign.",
+        "To stop schools from collecting devices.",
+        "To avoid keeping records."
+      ],
+      "answer": 0,
+      "explanation": "此处 to make 表目的，使用地方语言是为了更易理解和执行。",
+      "evidence": [
+        {
+          "paragraph": 3,
+          "quote": "To make the guidance easier to follow, information was shared in regional languages"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "How could the school campaign influence adults outside school?",
+      "options": [
+        "All parents are required to attend every seminar.",
+        "Students sell devices to their teachers.",
+        "The campaign replaces household laws.",
+        "Children can bring new habits home."
+      ],
+      "answer": 3,
+      "explanation": "孩子把新习惯带回家，因此可能影响父母。文章没有说所有家长必须参会。",
+      "evidence": [
+        {
+          "paragraph": 4,
+          "quote": "students often bring new habits home"
+        }
+      ]
+    }
   ]
 }

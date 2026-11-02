@@ -159,5 +159,64 @@
       "text": "problem–solution",
       "meaning_zh": "问题—解决（篇章模式）"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "Which approach to the outbreak is emphasised in the passage?",
+      "options": [
+        "Rely only on travel bans.",
+        "Stop all community outreach.",
+        "Combine stronger control measures, access to care and community trust.",
+        "Assume the outbreak will end without action."
+      ],
+      "answer": 2,
+      "explanation": "原文强调防控、可及性和信任的组合，而非单一禁令。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "scaling up control measures, gaining greater access to affected communities, and building trust"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "What do the TUMAINI trials first test?",
+      "options": [
+        "Whether a Zaire-strain vaccine can protect contacts of confirmed patients.",
+        "Whether all treatment centres can close.",
+        "Whether the outbreak began in Kenya.",
+        "Whether every traveller should be banned."
+      ],
+      "answer": 0,
+      "explanation": "试验先检验为扎伊尔毒株研制的疫苗，能否保护确诊患者的接触者。",
+      "evidence": [
+        {
+          "paragraph": 3,
+          "quote": "can protect contacts of confirmed patients through a ring-vaccination approach"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "What do deaths occurring before patients reach treatment centres suggest?",
+      "options": [
+        "Every patient already receives early treatment.",
+        "Access to care and early detection remain inadequate.",
+        "Community trust is no longer relevant.",
+        "Treatment capacity can never improve."
+      ],
+      "answer": 1,
+      "explanation": "社区内、到达治疗中心之前的死亡，提示病例发现和医疗可及性仍不足。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "a sign that detection and access remain weak"
+        }
+      ]
+    }
   ]
 }

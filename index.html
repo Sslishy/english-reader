@@ -29,12 +29,14 @@
     </div>
     <div class="card" id="archiveCard">
       <h3 class="card-title">🗂 往期文章</h3>
+      <div id="recommendations" class="recommendations"></div>
       <ul id="archiveList" class="archive"></ul>
     </div>
   </section>
 
   <!-- ========== 复习 ========== -->
   <section id="view-review" class="view" hidden>
+    <div id="translationReviewBox"></div>
     <div id="reviewBox"></div>
   </section>
 
@@ -74,7 +76,7 @@
     </div>
     <div class="card" id="backupCard">
       <h3 class="card-title">💾 备份 / 迁移（手机 ⇄ 电脑）</h3>
-      <p class="hint">所有数据只保存在本浏览器（localStorage）。换设备前先「导出备份」，在另一台设备上「导入」即可。备份包含生词本、复习进度、已学四六级词和设置。</p>
+      <p class="hint">所有数据只保存在本浏览器（localStorage）。换设备前先「导出备份」，在另一台设备上「导入」即可。备份包含生词本、复习进度、已学四六级词、阅读答题、听写、翻译错题、词汇熟悉度和设置。</p>
       <div class="row">
         <button class="primary" id="btnBackup">⬇️ 导出备份 JSON</button>
         <button id="btnImportMerge">⬆️ 导入（合并）</button>
@@ -91,7 +93,7 @@
     </div>
     <div class="card" id="syncCard">
       <h3 class="card-title">☁️ GitHub 同步（电脑 ⇄ 手机自动同步）</h3>
-      <p class="hint">把生词本、短语、复习进度、每日新词进度、设置和「我来翻译」的译文 / 批改自动保存到你自己 GitHub 账号里的一个私密（secret）gist，多台设备填同一个 token 就会自动合并同步。</p>
+      <p class="hint">把生词本、复习进度、阅读答题、听写结果、翻译错题、词汇熟悉度、设置和「我来翻译」的译文 / 批改自动保存到你自己 GitHub 账号里的一个私密（secret）gist，多台设备填同一个 token 就会自动合并同步。</p>
       <div id="syncSetup">
         <ol class="sync-steps">
           <li>登录 GitHub 后打开 <a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=english-reader-sync" target="_blank" rel="noopener" id="syncTokenLink">生成 token 页面</a>（已自动勾选 <b>gist</b>，其他权限都不要勾）。</li>
@@ -174,9 +176,11 @@
 <div id="toast"></div>
 
 <script src="js/srs.js"></script>
+<script src="js/learning-core.js"></script>
 <script src="js/app.js"></script>
 <script src="js/review.js"></script>
 <script src="js/practice.js"></script>
+<script src="js/learning.js"></script>
 <script src="js/sync.js"></script>
 <script>ER.start(); ER.startSync();</script>
 </body>

@@ -155,5 +155,64 @@
       "text": "Writing Task 2",
       "meaning_zh": "（雅思）写作任务二"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "What is New York doing in response to coastal flood risk?",
+      "options": [
+        "Raising a park and building flood defences.",
+        "Moving every resident inland immediately.",
+        "Removing all coastal parks.",
+        "Waiting for sea levels to fall."
+      ],
+      "answer": 0,
+      "explanation": "文章主线是抬高公园、修建防洪设施，应对风暴潮和海平面上升。",
+      "evidence": [
+        {
+          "paragraph": 0,
+          "quote": "raising East River Park by as much as three metres and building a hidden floodwall"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "How much future sea-level rise does the design allow for?",
+      "options": [
+        "About 30 metres.",
+        "About three metres.",
+        "About 76 centimetres.",
+        "About 840 kilometres."
+      ],
+      "answer": 2,
+      "explanation": "需要区分地基深度、公园抬高高度、预留海平面高度和海岸线长度。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "The design leaves about 76 centimetres for future sea-level rise"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "Why are everyday tides mentioned?",
+      "options": [
+        "They prove superstorms have stopped.",
+        "Flood risk may become frequent rather than limited to rare disasters.",
+        "They mean no floodgates are needed.",
+        "They affect only inland cities."
+      ],
+      "answer": 1,
+      "explanation": "未来甚至日常潮汐都可能造成积水，说明风险会从罕见灾害扩展为频繁问题。",
+      "evidence": [
+        {
+          "paragraph": 3,
+          "quote": "later, with every daily tide"
+        }
+      ]
+    }
   ]
 }

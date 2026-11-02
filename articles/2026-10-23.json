@@ -165,5 +165,64 @@
       "text": "stronger commitments",
       "meaning_zh": "更有力的承诺"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "What is the main message of the passage?",
+      "options": [
+        "The climate goal is harder to reach, but stronger action can still limit the overshoot.",
+        "The Paris Agreement has already stopped global warming.",
+        "Renewable energy is no longer useful.",
+        "All countries have met their climate promises."
+      ],
+      "answer": 0,
+      "explanation": "作者既说明超标难以避免，也强调减排仍能让超标幅度更小、持续时间更短。",
+      "evidence": [
+        {
+          "paragraph": 3,
+          "quote": "Overshoot is not surrender"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "How much warming is projected if every national climate plan is fully implemented?",
+      "options": [
+        "1.5°C",
+        "1.8°C",
+        "2.6°C",
+        "2.8°C"
+      ],
+      "answer": 2,
+      "explanation": "注意区分 current policies 对应 2.8°C，而所有国家计划落实对应约 2.6°C。",
+      "evidence": [
+        {
+          "paragraph": 1,
+          "quote": "warming would still reach about 2.6°C"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "What can be inferred about current national pledges?",
+      "options": [
+        "They already remove the need for carbon removal.",
+        "They are insufficient for the lowest-overshoot scenario.",
+        "They guarantee a temperature peak before 2030.",
+        "They have eliminated fossil fuels."
+      ],
+      "answer": 1,
+      "explanation": "最低超标情景要求的减排幅度，比现有承诺能实现的幅度更大，因此现有承诺不足。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "far deeper cuts than current national pledges would deliver"
+        }
+      ]
+    }
   ]
 }

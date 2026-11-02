@@ -173,5 +173,64 @@
       "text": "previously overlooked",
       "meaning_zh": "以前被忽视的"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "What role does AI play in the TB project described?",
+      "options": [
+        "It replaces all medical treatment.",
+        "It supports faster screening while clinicians retain the final decision.",
+        "It proves that specialists are unnecessary.",
+        "It prevents all infections."
+      ],
+      "answer": 1,
+      "explanation": "AI 帮助筛查、提示需要进一步检测的人，最终决定仍由医护人员作出。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "health professionals still make the final decision"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "How quickly can the tool screen a chest X-ray?",
+      "options": [
+        "As little as 45 seconds.",
+        "Exactly two hours.",
+        "At least one week.",
+        "About one month."
+      ],
+      "answer": 0,
+      "explanation": "as little as 表示最快可达，不表示每次都固定耗时 45 秒。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "in as little as 45 seconds"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "Why does the writer mention that independent results are limited?",
+      "options": [
+        "To show that the tool has been banned.",
+        "To argue that X-rays never work.",
+        "To suggest the reported results should be interpreted cautiously.",
+        "To prove every reported figure is false."
+      ],
+      "answer": 2,
+      "explanation": "说明数据主要来自项目参与方、独立结果有限，是提醒读者谨慎评估，而不是断言结果造假。",
+      "evidence": [
+        {
+          "paragraph": 4,
+          "quote": "most of these figures come from Google and its partners, and independent results are still limited"
+        }
+      ]
+    }
   ]
 }

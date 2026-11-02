@@ -97,9 +97,37 @@ def validate(a):
                 z = x.get("meaning_zh")
                 if isinstance(z, str) and z.strip() and not re.search(r"[\u4e00-\u9fff]", z):
                     errs.append(f"phrases[{i}].meaning_zh must contain Chinese")
-    extra = set(a) - set(STR_FIELDS) - {"paragraphs", "paragraphs_zh", "key_words", "phrases"}
+    extra = set(a) - set(STR_FIELDS) - {"paragraphs", "paragraphs_zh", "key_words", "phrases", "questions"}
     if extra:
         print("warning: unknown fields kept as-is:", ", ".join(sorted(extra)), file=sys.stderr)
+    questions = a.get("questions")
+    if questions is not None:
+        if not isinstance(questions, list):
+            errs.append("questions must be a list")
+        else:
+            ids = set()
+            for i, q in enumerate(questions):
+                prefix = f"questions[{i}]"
+                if not isinstance(q, dict):
+                    errs.append(prefix + " must be an object"); continue
+                if not isinstance(q.get("id"), str) or not re.fullmatch(r"[A-Za-z0-9_-]+", q["id"]) or q["id"] in ids:
+                    errs.append(prefix + ".id must be unique and use letters, digits, hyphens or underscores")
+                ids.add(str(q.get("id")))
+                for field in ["prompt", "explanation"]:
+                    if not isinstance(q.get(field), str) or not q[field].strip():
+                        errs.append(prefix + "." + field + " is required")
+                opts = q.get("options")
+                if not isinstance(opts, list) or not 2 <= len(opts) <= 6 or not all(isinstance(o, str) and o.strip() for o in opts):
+                    errs.append(prefix + ".options must contain 2-6 strings")
+                elif type(q.get("answer")) is not int or not 0 <= q["answer"] < len(opts):
+                    errs.append(prefix + ".answer must index an option")
+                ev = q.get("evidence")
+                if not isinstance(ev, list) or not ev:
+                    errs.append(prefix + ".evidence must not be empty")
+                else:
+                    for e in ev:
+                        if not isinstance(e, dict) or type(e.get("paragraph")) is not int or not isinstance(p, list) or not 0 <= e["paragraph"] < len(p) or not isinstance(e.get("quote"), str) or not e["quote"] or e["quote"] not in p[e["paragraph"]]:
+                            errs.append(prefix + ".evidence must quote the referenced paragraph exactly")
     return errs
 
 
