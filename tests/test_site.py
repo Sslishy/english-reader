@@ -139,7 +139,9 @@ def run_session(page, wrong=(), allow_retry_wrong=False, max_steps=200, log=None
     act(page.locator("#btnStart"))
     while steps < max_steps:
         steps += 1
-        page.wait_for_function("document.querySelector('#qCard,#btnGotIt,#summaryCard')")
+        page.wait_for_function("document.querySelector('#qCard,#btnGotIt,#summaryCard,#retryIntro')")
+        if page.locator("#retryIntro").count():
+            act(page.locator("#btnStartRetry")); continue
         if page.locator("#summaryCard").count():
             break
         if page.locator("#btnGotIt").count():
@@ -153,6 +155,7 @@ def run_session(page, wrong=(), allow_retry_wrong=False, max_steps=200, log=None
         if shots is not None and st["type"] not in shots:
             shots[st["type"]] = f"/tmp/er_mobile_q_{st['type']}.png"; page.screenshot(path=shots[st["type"]])
         if st["type"] == "recall":
+            page.fill("#recallInput", "未记清" if bad else page.evaluate("w=>ER.findWord(w).zh||ER.findWord(w).en||'测试含义'", st["word"]))
             act(page.locator("#btnReveal"))
             act(page.locator("#btnRecallAgain" if bad else "#btnRecallGood"))
         elif st["type"] == "spell":

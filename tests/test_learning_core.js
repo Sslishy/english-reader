@@ -1,8 +1,8 @@
 const fs=require('fs'),path=require('path'),assert=require('assert');
 require('../js/learning-core.js');const C=globalThis.LearningCore;let n=0;
 function test(name,f){f();console.log('PASS '+name);n++;}
-test('all 11 passages have three valid evidence-linked questions',()=>{
- let passages=fs.readdirSync(path.join(__dirname,'../articles')).filter(x=>/^20.*\.json$/.test(x));assert.equal(passages.length,11);
+test('all passages have three valid evidence-linked questions',()=>{
+ let passages=fs.readdirSync(path.join(__dirname,'../articles')).filter(x=>/^20.*\.json$/.test(x));assert.ok(passages.length>=11);
  for(const file of passages){let a=JSON.parse(fs.readFileSync(path.join(__dirname,'../articles',file)));assert.equal(C.validQuestions(a).length,3,file);assert.equal(new Set(a.questions.map(q=>q.id)).size,3);assert.deepEqual(a.questions.map(q=>q.type),['main','detail','inference']);}
 });
 test('invalid evidence and unsafe question ids are rejected',()=>{let a={paragraphs:['The ocean absorbs heat.'],questions:[{id:'q1',prompt:'Why?',options:['A','B'],answer:0,evidence:[{paragraph:0,quote:'Invented quote'}]}]};assert.equal(C.validQuestions(a).length,0);a.questions[0].evidence[0].quote='absorbs heat';a.questions[0].id='q1"]';assert.equal(C.validQuestions(a).length,0);});

@@ -86,4 +86,11 @@ test('invalid calendar dates are rejected and malformed old counters are repaire
  const s=SRS.normalize({stage:999,reps:-3,due:'broken',skills:{usage:{active:true,successDates:'broken'}}},day);
  assert.equal(s.stage,6);assert.equal(s.reps,0);assert.equal(s.due,day);assert.deepEqual(s.skills.usage.successDates,[]);
 });
+test('written recall evidence is bounded and survives normalization and backup',()=>{
+ const s=rec(SRS.init(day),'good',day,{self:true,response:'恢复能力',task:'recall'});
+ assert.equal(s.history[0].response,'恢复能力');assert.equal(s.history[0].task,'recall');
+ assert.deepEqual(SRS.normalize(JSON.parse(JSON.stringify(s)),day).history,s.history);
+ const long=rec(s,'good',day,{practice:true,response:'词'.repeat(600)});
+ assert.equal(long.history.at(-1).response.length,500);assert.equal(long.history.at(-1).first,false);
+});
 console.log(tests+' SRS tests passed');

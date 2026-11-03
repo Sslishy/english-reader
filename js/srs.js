@@ -68,6 +68,8 @@
     sk.active=true; sk.reps++; sk.last=date;
     s.reps++; s.qn++; s.last=date;
     s.history.push({date:date,skill:skill,rating:rating,assisted:assisted,practice:practice,self:!!opt.self,first:first,elapsed:elapsed});
+    if(typeof opt.response==='string')s.history[s.history.length-1].response=opt.response.slice(0,500);
+    if(typeof opt.task==='string')s.history[s.history.length-1].task=opt.task.slice(0,30);
     s.history=s.history.slice(-HISTORY_LIMIT);
     if(first){
       sk.lastScored=date;

@@ -61,7 +61,7 @@ def word(page, name):
 
 def start(page):
     page.click('#btnStart')
-    page.wait_for_selector('#btnGotIt, #qCard, #summaryCard')
+    page.wait_for_selector('#btnGotIt, #qCard, #summaryCard, #retryIntro, #statDue')
 
 
 def step(page, rating='good', hint=False):
@@ -75,6 +75,7 @@ def step(page, rating='good', hint=False):
     if typ == 'recall':
         if hint and page.locator('#btnRecallHint').count():
             page.click('#btnRecallHint')
+        page.fill('#recallInput', '未记清' if rating == 'again' else word(page, name)['zh'])
         page.click('#btnReveal')
         page.click({'good':'#btnRecallGood','hard':'#btnRecallHard','again':'#btnRecallAgain'}[rating])
     elif typ in ('spell', 'cloze'):
@@ -102,12 +103,15 @@ def step(page, rating='good', hint=False):
 
 def next_(page):
     page.click('#btnNext')
-    page.wait_for_selector('#btnGotIt, #qCard, #summaryCard')
+    page.wait_for_selector('#btnGotIt, #qCard, #summaryCard, #retryIntro, #statDue')
 
 
 def finish(page, wrong_first=(), limit=180):
     log = []
     for _ in range(limit):
+        if page.locator('#retryIntro').count():
+            page.click('#btnStartRetry')
+            continue
         if page.locator('#summaryCard').count():
             return log
         if page.locator('#btnGotIt').count():
@@ -154,11 +158,17 @@ with sync_playwright() as p:
     check('reading review begins with independent recall', item(page)['type'] == 'recall')
     check('translation and scoring hidden before reveal', '韧性；恢复力' not in page.inner_text('#qCard') and not page.locator('#btnRecallGood').is_visible())
     page.click('#btnReveal')
+    check('empty response cannot reveal answers or self-grade', not page.locator('#recallAnswer').is_visible() and not page.locator('#btnRecallGood').is_visible())
+    page.fill('#recallInput', 'resilience')
+    page.click('#btnReveal')
+    check('copying the English prompt does not count as explaining meaning', not page.locator('#recallAnswer').is_visible())
+    page.fill('#recallInput', '恢复能力')
+    page.click('#btnReveal')
     check('reveal shows meaning and three recall ratings', '韧性；恢复力' in page.inner_text('#qCard') and all(page.locator(x).is_visible() for x in ['#btnRecallGood','#btnRecallHard','#btnRecallAgain']))
     page.click('#btnRecallGood')
     good = word(page, 'resilience')['srs']
     check('independent recall advances only meaning', good['skills']['meaning']['stage'] == 3 and good['skills']['spelling']['stage'] == 0)
-    check('history distinguishes self-reported recall', good['history'][-1]['self'] and not good['history'][-1]['assisted'])
+    check('history preserves the pre-reveal answer and self-rating', good['history'][-1]['self'] and not good['history'][-1]['assisted'] and good['history'][-1]['response']=='恢复能力' and page.locator('#recallInput').get_attribute('readonly') is not None)
 
     seed(page, [old('resilience', '韧性；恢复力')])
     start(page)
@@ -185,19 +195,20 @@ with sync_playwright() as p:
       v.srs.skills.meaning.due='2026-11-15';v.srs.skills.usage=Object.assign({},v.srs.skills.meaning,{stage:0,due:ER.today(),active:true,last:'2026-11-01'});
       v.srs=SRS.normalize(v.srs,ER.today());ER.saveVocab();}''')
     page.reload(); page.wait_for_selector('#btnStart'); start(page)
+    repeated=page.evaluate("ER.clozeBlank({word:'contribute'},'They contribute today and contributed yesterday.').html")
+    check('context hides repeated target forms instead of leaking the answer', 'contribute' not in repeated.lower() and repeated.count('id=\"clozeBlank\"')==1 and '〔同词〕' in repeated)
     check('usage prompt blanks inflected form', item(page)['type'] == 'cloze' and item(page)['answer'].lower() == 'contributed')
     step(page)
     check('usage success records separate ability', word(page, 'contribute')['srs']['history'][-1]['skill'] == 'usage')
 
-    # A revealed word must not immediately earn another independent skill promotion.
+    # Different abilities are spread over days, not three prompts for one word.
     seed(page, [old('resilience', '韧性；恢复力')], mode='balanced')
     start(page)
     step(page)
     next_(page)
-    near = item(page)
-    check('same-word follow-up after reveal is treated as warm-up', near['word']=='resilience' and near.get('recentExposure') and near.get('assisted'))
-    step(page)
-    check('recently exposed answer cannot advance another ability', word(page,'resilience')['srs']['skills'][near['skill']]['stage']==0)
+    check('one-word session finishes after one assessment', page.locator('#summaryCard').count()==1)
+    track=word(page,'resilience')['srs']
+    check('other abilities are deferred without invented success', track['skills']['usage']['due']=='2026-11-03' and track['skills']['spelling']['due']=='2026-11-03' and track['skills']['usage']['stage']==0 and len(track['history'])==1)
 
     # Hints, unlike ordinary pronunciation in a spelling task, lower the score.
     seed(page, [old('resilience')], mode='balanced')
@@ -218,6 +229,16 @@ with sync_playwright() as p:
     page.click('#btnClozeHint')
     step(page)
     check('cloze Chinese hint cannot promote usage', word(page,'contribute')['srs']['skills']['usage']['stage']==1 and word(page,'contribute')['srs']['history'][-1]['assisted'])
+
+    seed(page,[old('withoutcontext')])
+    page.evaluate("""()=>{var v=ER.findWord('withoutcontext');v.sentence='This sentence has no target.';
+      v.srs.skills.usage.active=true;v.srs.skills.usage.due=ER.today();ER.saveVocab();ER.views.review.show();}""")
+    start(page)
+    check('unusable context has an explicit skip instead of false scoring', item(page)['type']=='context')
+    page.click('#btnSkipContext')
+    check('skipping missing context finishes and creates no score', page.locator('#summaryCard').count()==1 and len(word(page,'withoutcontext')['srs']['history'])==0)
+    page.click('#btnHome')
+    check('missing context cannot trap same-day restarting', page.inner_text('#statDue')=='0')
 
     # Known words are cold-tested at the spot-check date instead of showing a study card again.
     seed(page, [entry('resilience', '韧性；恢复力')])
@@ -249,12 +270,85 @@ with sync_playwright() as p:
 
     seed(page, [old('resilience')] + [old('word'+str(i)) for i in range(12)])
     start(page)
+    check('main round contains only one assessment per distinct word', len(state(page)['queue'])==13)
     log = finish(page, wrong_first={'resilience'})
+    check('review mixes written meaning and context production', {x['type'] for x in log}=={'recall','cloze'})
     attempts = [x for x in log if x['word'] == 'resilience' and x['skill'] == 'meaning']
-    check('wrong word receives two independent delayed successes', len(attempts) == 3 and not attempts[1]['first'] and not attempts[2]['first'], str([(x['type'],x['index']) for x in attempts]))
-    check('retries have at least three intervening other questions', len(attempts) == 3 and all(b['index']-a['index'] >= 4 for a,b in zip(attempts,attempts[1:])))
+    check('wrong word gets at most one optional final retry', len(attempts) == 2 and not attempts[1]['first'], str([(x['type'],x['index']) for x in attempts]))
+    check('retry comes after all first tests with eight other words between', len(attempts) == 2 and attempts[1]['index'] == 13 and len({x['word'] for x in log[1:13]})>=8)
     hist = word(page, 'resilience')['srs']['history']
     check('same-session corrections do not double-promote or erase error', hist[-1]['practice'] and word(page,'resilience')['srs']['skills']['meaning']['due'] == '2026-11-03')
+
+    # Small sets must finish, even when every answer is wrong.
+    for size in (3,4):
+        names=['small'+str(i) for i in range(size)]
+        seed(page,[old(w) for w in names])
+        start(page)
+        small_log=finish(page,wrong_first=set(names))
+        check(f'{size}-word set never loops after errors', len(small_log)==size and len({x['word'] for x in small_log})==size)
+        page.click('#btnHome')
+        check(f'{size}-word set stays finished on same-day restart', page.inner_text('#statDue')=='0' and page.locator('#btnResume').count()==0)
+        start(page)
+        check(f'{size}-word set cannot immediately re-enter the old queue', page.locator('#qCard').count()==0)
+        page.evaluate("ER.setToday('2026-11-03');ER.views.review.show()")
+        check(f'{size}-word errors are scheduled for tomorrow', page.inner_text('#statDue')==str(size))
+        page.reload();page.wait_for_selector('#statDue')
+
+    seed(page,[old('batch'+str(i)) for i in range(12)])
+    start(page)
+    batch=[]
+    while not page.locator('#retryIntro').count():
+        batch.append(item(page)['word']);step(page,'again');next_(page)
+    check('all twelve distinct words finish before optional corrections', len(batch)==12 and len(set(batch))==12)
+    page.reload();page.wait_for_selector('#btnResume');page.click('#btnResume');page.wait_for_selector('#retryIntro')
+    check('refresh keeps the optional retry boundary', page.locator('#btnStartRetry').is_visible())
+    page.click('#btnStartRetry')
+    retries=[]
+    while not page.locator('#summaryCard').count():
+        retries.append(item(page)['word']);step(page,'again');next_(page)
+    check('all-wrong retries terminate without growing another loop', len(retries)==4 and len(set(retries))==4)
+    check('failed retry keeps original schedule and no fabricated mastery', all(word(page,w)['srs']['history'][-1]['practice'] and word(page,w)['srs']['skills']['meaning']['learningPending'] for w in retries if word(page,w)['srs']['history'][-1]['skill']=='meaning'))
+
+    seed(page,[old('skip'+str(i)) for i in range(10)])
+    start(page)
+    while not page.locator('#retryIntro').count():
+        step(page,'again');next_(page)
+    page.click('#btnFinishReview')
+    check('optional correction can be skipped without losing tomorrow tasks', page.locator('#summaryCard').count()==1 and all(word(page,'skip'+str(i))['srs']['due']=='2026-11-03' for i in range(10)))
+
+    seed(page,[],new=5)
+    start(page)
+    new_log=finish(page)
+    check('five new words get one written practice each', len(new_log)==5 and len({x['word'] for x in new_log})==5 and all(x['first'] for x in new_log))
+    check('new-word practice cannot masquerade as delayed mastery', all(word(page,x['word'])['srs']['stage']==0 and word(page,x['word'])['srs']['history'][-1]['assisted'] for x in new_log))
+    page.evaluate("ER.setToday('2026-11-03');ER.settings.newPerDay=0;ER.views.review.show()")
+    start(page)
+    check('yesterday new words get cold meaning recall today', item(page)['type']=='recall' and not item(page).get('assisted'))
+    cold_log=finish(page)
+    check('one next-day independent answer resolves pending without repeats', len(cold_log)==5 and all(not word(page,x['word'])['srs']['skills']['meaning']['learningPending'] for x in cold_log))
+    page.reload();page.wait_for_selector('#statDue')
+
+    seed(page,[old('resilience')])
+    start(page)
+    page.fill('#recallInput','坚持并从挫折中恢复')
+    page.reload();page.wait_for_selector('#btnResume');page.click('#btnResume');page.wait_for_selector('#recallInput')
+    check('refresh preserves the written answer before reveal', page.input_value('#recallInput')=='坚持并从挫折中恢复' and not page.locator('#recallAnswer').is_visible())
+    page.click('#btnReveal')
+    page.reload();page.wait_for_selector('#btnResume');page.click('#btnResume');page.wait_for_selector('#recallRating:not([hidden])')
+    check('refresh after reveal retains locked original answer without grading', page.input_value('#recallInput')=='坚持并从挫折中恢复' and page.locator('#recallInput').get_attribute('readonly') is not None and len(word(page,'resilience')['srs']['history'])==0)
+    page.click('#btnRecallGood');next_(page)
+
+    seed(page,[old('resilience')])
+    start(page)
+    page.click('#btnRecallSkip');next_(page)
+    check('cannot-recall shortcut records failure without self-awarding success', word(page,'resilience')['srs']['history'][-1]['rating']=='again' and page.locator('#summaryCard').count()==1)
+
+    seed(page,[old('resilience')])
+    page.evaluate("localStorage.setItem('er_review_session',JSON.stringify({version:2,date:ER.today(),session:{queue:Array(12).fill({word:'resilience',kind:'test',skill:'meaning'}),targets:{}}}))")
+    page.reload();page.wait_for_selector('#statDue')
+    check('obsolete looping queue is retired without erasing vocabulary', page.locator('#btnResume').count()==0 and word(page,'resilience')['srs']['stage']==2)
+    start(page)
+    check('replacement session has only one test for a legacy word', len(state(page)['queue'])==1)
 
     seed(page, [old('constructor', '构造者')])
     start(page)
@@ -288,7 +382,11 @@ with sync_playwright() as p:
     ctx, page = profile(mobile=True)
     seed(page, [old('resilience', '韧性；恢复力')])
     start(page)
+    out = ROOT / 'output' / 'playwright'
+    out.mkdir(parents=True, exist_ok=True)
+    page.screenshot(path=str(out/'review-written-mobile.png'), full_page=True)
     check('mobile review has no horizontal overflow', page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1'))
+    page.fill('#recallInput', '恢复能力')
     page.locator('#btnReveal').tap()
     check('mobile rating buttons have comfortable targets', all(page.locator(sel).bounding_box()['height'] >= 40 for sel in ['#btnRecallGood','#btnRecallHard','#btnRecallAgain']))
     page.locator('#btnRecallHard').tap()
@@ -296,6 +394,13 @@ with sync_playwright() as p:
     out = ROOT / 'output' / 'playwright'
     out.mkdir(parents=True, exist_ok=True)
     page.screenshot(path=str(out/'review-mobile.png'), full_page=True)
+    seed(page,[old('resilience'),old('contribute','贡献')])
+    page.evaluate("()=>{var v=ER.findWord('contribute');v.sentence='She contributed a lot to the project.';v.sentence_zh='她为这个项目贡献了很多。';ER.saveVocab();}")
+    start(page);step(page);next_(page)
+    check('mobile context task hides target word and accepts typed production', item(page)['type']=='cloze' and 'contribute' not in page.inner_text('#qCard'))
+    page.screenshot(path=str(out/'review-context-mobile.png'), full_page=True)
+    step(page);next_(page)
+    check('mobile mixed review finishes without looping', page.locator('#summaryCard').count()==1)
     ctx.close()
     browser.close()
 

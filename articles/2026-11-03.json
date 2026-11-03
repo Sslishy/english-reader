@@ -159,5 +159,64 @@
       "text": "cause–effect patterns",
       "meaning_zh": "因果关系的展开方式"
     }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "What is the main purpose of the Education Cannot Wait campaign described in the passage?",
+      "options": [
+        "To close schools in conflict zones.",
+        "To raise about 600 million dollars so crisis-affected children can keep learning.",
+        "To replace teachers with online lessons.",
+        "To move humanitarian money away from education."
+      ],
+      "answer": 1,
+      "explanation": "文章主旨：ECW 筹集约 6 亿美元，让受危机影响的儿童继续上学。",
+      "evidence": [
+        {
+          "paragraph": 1,
+          "quote": "is seeking about 600 million US dollars"
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "How much of the funding target has early pledges already secured?",
+      "options": [
+        "About 10 per cent.",
+        "Close to 40 per cent, roughly 284 million dollars.",
+        "Exactly half of it.",
+        "The full 600 million dollars."
+      ],
+      "answer": 1,
+      "explanation": "德国、英国和瑞士等国的早期承诺已筹得接近 40%，约 2.84 亿美元。",
+      "evidence": [
+        {
+          "paragraph": 2,
+          "quote": "have already secured close to 40 per cent of the target"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "Why does ECW argue that funding education in emergencies matters beyond lessons?",
+      "options": [
+        "Because schools also give children protection, routine and access to other services.",
+        "Because aid budgets for education are already very large.",
+        "Because children prefer school to staying at home.",
+        "Because conferences in Geneva require it."
+      ],
+      "answer": 0,
+      "explanation": "ECW 认为学校关闭时，孩子失去的不只是课程，还有保护、日常秩序和其他服务。",
+      "evidence": [
+        {
+          "paragraph": 3,
+          "quote": "children lose not only lessons but also protection, routine and access to other services"
+        }
+      ]
+    }
   ]
 }

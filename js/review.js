@@ -97,13 +97,16 @@ ER.resolveSentence = resolveSentence;
 ER.clozeBlank = clozeBlank;
 var SESSION_KEY='er_review_session';
 var SKILL_NAME={meaning:'词义',usage:'语境',spelling:'拼写'};
-var MAX_ATTEMPTS=4, RETRY_GAP=3;
+var RETRY_GAP=8;
 function balanced(){ return ER.settings.reviewMode==='balanced'; }
-function saveSession(){ if(S) ER.lsSet(SESSION_KEY,{version:2,date:today(),session:S},true); }
+function saveSession(){ if(S) ER.lsSet(SESSION_KEY,{version:3,date:today(),session:S},true); }
 function clearSession(){ try{localStorage.removeItem(SESSION_KEY);}catch(e){} }
 function savedSession(){
   var d=ER.lsGet(SESSION_KEY,null);
-  return d&&d.version===2&&d.date===today()&&d.session&&Array.isArray(d.session.queue)&&d.session.targets?d.session:null;
+  // The old queue could contain four copies of each ability. Keep saved SRS results,
+  // but never resume that loop under the new one-word-per-day contract.
+  if(d&&d.version!==3){clearSession();return null;}
+  return d&&d.version===3&&d.date===today()&&d.session&&Array.isArray(d.session.queue)&&d.session.targets?d.session:null;
 }
 function counts(){
   var v=ER.getVocab(), t=today(), d=daily();
@@ -149,7 +152,7 @@ function renderHome(msg){
   var c=counts(), resume=savedSession(), seenMap=seen(), oldKnown=Object.keys(seenMap).filter(function(w){return seenMap[w]==='known'&&!ER.findWord(w);}).length;
   var h='<div class="card review-home"><div class="rv-head"><h2 style="margin:0;font-size:20px">今日复习</h2><span class="muted">'+esc(today())+'</span></div>';
   if(msg) h+=msg;
-  h+='<p class="review-intro">先自己想起来，再核对答案。今天学会的词，隔天再验证。</p>'+
+  h+='<p class="review-intro">写出意思，填出用法。每词先测一次，错词留到最后。</p>'+
     '<div class="stats"><div class="stat"><b id="statDue">'+c.due+'</b>到期旧词 / 收藏词</div>'+
     '<div class="stat"><b id="statNew">'+c.newLeft+'</b>建议补充新词</div>'+
     '<div class="stat"><b>'+c.mastered+'</b>词义已通过延迟验证</div></div>'+
@@ -159,7 +162,7 @@ function renderHome(msg){
     '<div class="review-settings"><label>学习重点 <select id="optReviewMode"><option value="reading"'+(!balanced()?' selected':'')+'>阅读：词义 + 语境</option><option value="balanced"'+(balanced()?' selected':'')+'>综合：加练拼写</option></select></label>'+
     '<label>每天新词 <select id="optNewPer">'+[0,5,10,15,20,30].map(function(n){return '<option value="'+n+'"'+(+ER.settings.newPerDay===n?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label>'+
     '<label class="opt"><input type="checkbox" id="optCet6"'+(ER.settings.cet6?' checked':'')+'> 包含六级</label></div>'+
-    '<details class="review-help"><summary>这一轮会怎样帮助记忆？</summary><p>先复习到期和易忘的旧词，再学阅读收藏词，最后补充四六级词。词义、语境、拼写分别记录；提示答对不会晋级。新词或错词要隔开至少 3 个其他词的练习，再尝试两次独立回忆，每项最多尝试 4 次。间隔不足或仍未记牢，会留到明天。</p><p>阅读模式暂不安排单独的拼写到期任务，切回综合模式可继续。语境填空需要写出词形，错误只记入语境进度。所有数据保存在当前浏览器，仍可通过原来的备份和同步迁移。</p></details>'+
+    '<details class="review-help"><summary>这一轮会怎样帮助记忆？</summary><p>先复习旧词，再学收藏词和四六级词。词义题先写一个核心意思，再对照答案自评；语境题隐藏目标词，输入空缺的英文。不同能力分天安排，每词每天只做一次正式测试。</p><p>完成全部单词后，可以选择补练错词一次；与上次出现之间至少隔开 8 个不同词。只有三四个词或间隔不足时直接结束，留到明天验证。新词初练、提示和当天补练不算独立掌握。综合模式加练拼写，各能力进度分别保存。</p></details>'+
     (oldKnown?'<div class="known-recover"><p>旧版有 '+oldKnown+' 个词曾标记「我认识」而不再出现。</p><button id="btnRestoreKnown">恢复这些词的低频抽查</button></div>':'')+'</div>';
   h+=retentionHtml()+'<div class="card"><h3 class="card-title">未来 14 天复习量</h3>'+calendarHtml()+'</div>';
   box.innerHTML=h;
@@ -180,6 +183,21 @@ function renderHome(msg){
 }
 function targetKey(it){return it.word.toLowerCase()+'|'+it.skill;}
 function addTest(q,v,skill,isNew){q.push({kind:'test',word:v.word,skill:skill,first:true,retry:0,isNew:!!isNew});}
+function chooseSkill(v,index){
+  var sk=v.srs.skills,t=today();
+  var due=['meaning','usage','spelling'].filter(function(k){return (k!=='spelling'||balanced())&&sk[k].active&&sk[k].due<=t;});
+  if(v.srs.added===SRS.addDays(t,-1)&&due.indexOf('meaning')>=0)return 'meaning';
+  // Introduce context from the first review, without another pass over the same word.
+  var sent=resolveSentence(v);
+  if(index%2===1&&!sk.usage.active&&!sk.meaning.known&&sent&&clozeBlank(v,sent.en))due.push('usage');
+  due.sort(function(a,b){
+    var da=sk[a].lastScored||'',db=sk[b].lastScored||'';
+    if(da!==db)return da<db?-1:1;
+    var order=index%2===1?['usage','meaning','spelling']:['meaning','usage','spelling'];
+    return order.indexOf(a)-order.indexOf(b);
+  });
+  return due[0]||'meaning';
+}
 function startSession(){
   box.innerHTML='<div class="card"><p class="muted"><span class="spinner"></span>正在准备今天的单词…</p></div>';
   Promise.all([loadLists(),ensureExamples()]).then(function(){
@@ -190,16 +208,9 @@ function startSession(){
       var da=SRS.dueDate(a.srs,balanced()), db=SRS.dueDate(b.srs,balanced());
       return da<db?-1:da>db?1:(b.srs.lapses||0)-(a.srs.lapses||0);
     }).slice(0,DUE_CAP);
-    due.forEach(function(v){
+    due.forEach(function(v,index){
       if(!(v.srs.reps||0)&&!v.srs.skills.meaning.known){q.push({kind:'card',word:v.word});addTest(q,v,'meaning',true);return;}
-      var skills=v.srs.skills;
-      ['meaning','usage','spelling'].forEach(function(k){
-        if(k==='spelling'&&!balanced()) return;
-        if(skills[k].active&&skills[k].due<=t) addTest(q,v,k,false);
-      });
-      var mr=skills.meaning.reps||0;
-      if(!skills.usage.active&&mr>=2&&mr%3===2&&resolveSentence(v)&&clozeBlank(v,resolveSentence(v).en)) addTest(q,v,'usage',false);
-      if(balanced()&&!skills.spelling.active&&mr>=1) addTest(q,v,'spelling',false);
+      addTest(q,v,chooseSkill(v,index),false);
     });
     news.forEach(function(x){q.push({kind:'card',cet:x,word:x.word});addTest(q,x,'meaning',true);});
     // Round-robin by word keeps its card/meaning/usage/spelling apart where possible.
@@ -210,20 +221,23 @@ function startSession(){
       order.forEach(function(w){if(groups[w].length)q.push(groups[w].shift());});
     }
     if(!q.length){clearSession();renderHome('<p class="feedback ok">今天的到期词和新词任务已完成。明天回来看看还能想起多少。</p>');return;}
-    S={date:t,queue:q,idx:0,correct:0,wrong:0,assisted:0,reset:[],advanced:[],learned:[],known:[],retryOk:0,targets:{},exposures:{},startDue:due.length};
+    S={date:t,queue:q,idx:0,correct:0,wrong:0,assisted:0,reset:[],advanced:[],learned:[],known:[],retryOk:0,targets:{},exposures:{},startDue:due.length,mainEnd:q.length,retriesPrepared:false,retryStarted:false};
     saveSession();next();
   }).catch(function(e){renderHome('<p class="err">准备失败：'+esc(e.message||e)+'。请通过 http(s) 打开网站后重试。</p>');});
 }
 function progressHtml(){
-  var n=S.queue.length,i=Math.min(S.idx,n);
-  return '<div class="rv-head"><span class="muted">第 '+(i+1)+' / '+n+' 项 · 无提示 '+S.correct+' · 待加强 '+S.wrong+'</span><button id="btnQuit">暂停 / 结束本轮</button></div><div class="progress"><i style="width:'+Math.round(i/n*100)+'%"></i></div>';
+  var main=S.queue.slice(0,S.mainEnd).filter(function(q){return q.kind==='test';}),done=main.filter(function(q){return q.done;}).length;
+  var retry=S.idx>=S.mainEnd,n=retry?S.queue.length-S.mainEnd:main.length,i=retry?S.idx-S.mainEnd:done;
+  return '<div class="rv-head"><span class="muted">'+(retry?'错词补练 · '+(i+1)+' / '+n+' 词 · 每词仅一次':'本轮 '+n+' 个不同词 · 已完成 '+done)+' · 无提示 '+S.correct+'</span><button id="btnQuit">暂停 / 结束本轮</button></div><div class="progress"><i style="width:'+Math.round(i/Math.max(1,n)*100)+'%"></i></div>';
 }
 function bindQuit(){ $('btnQuit').onclick=function(){saveSession();summary(true);}; }
 function next(){
   if(!S)return renderHome();
   if(S.date!==today()){clearSession();renderHome('<p class="hint">已进入新的一天，按最新到期情况重新安排。</p>');return;}
   while(S.idx<S.queue.length){var it=S.queue[S.idx];if(it.done||(it.kind==='test'&&!ER.findWord(it.word))){S.idx++;continue;}break;}
+  if(S.idx>=S.mainEnd&&!S.retriesPrepared)prepareRetries();
   if(S.idx>=S.queue.length)return summary(false);
+  if(S.idx>=S.mainEnd&&!S.retryStarted)return renderRetryIntro();
   saveSession();var cur=S.queue[S.idx];if(cur.kind==='card')renderCard(cur);else renderTest(cur);window.scrollTo(0,0);
 }
 function advance(){if(!S)return;S.idx++;saveSession();next();}
@@ -259,24 +273,43 @@ function renderCard(it){
 }
 function renderRecall(it,v){
   it.type='recall';it.skill=it.skill||'meaning';
-  box.innerHTML='<div class="card">'+progressHtml()+'<div class="qcard" id="qCard" data-type="recall"><span class="qtype">词义 · 主动回忆'+(!it.first?' · 隔开再练':'')+'</span>'+
-    '<div class="qword" id="qPrompt">'+esc(v.word)+'</div><p class="recall-instruction">先在心里说出它的意思，再看答案核对。</p>'+
-    '<div class="row recall-actions"><button id="btnSay">🔊 发音</button><button id="btnRecallHint">给我原句提示</button><button class="primary big" id="btnReveal">想好了，看答案</button></div>'+
-    '<div id="recallHint" class="hint" hidden></div><div id="recallAnswer" hidden></div><div id="recallRating" class="recall-ratings" hidden>'+ 
-    '<button id="btnRecallAgain">没想起来</button><button id="btnRecallHard">模糊 / 猜的</button><button class="primary" id="btnRecallGood">独立想起来了</button></div>'+
-    '<div class="feedback" id="feedback" aria-live="polite"></div><div class="row recall-actions"><button class="primary" id="btnNext" hidden>下一题 →</button></div></div></div>';
+  box.innerHTML='<div class="card">'+progressHtml()+'<div class="qcard" id="qCard" data-type="recall"><span class="qtype">词义 · 写出意思'+(!it.first?' · 错词补练':'')+'</span>'+
+    '<div class="qword" id="qPrompt">'+esc(v.word)+'</div><p class="recall-instruction">写出一个核心意思，或用自己的话解释。提交后再看释义。</p>'+
+    '<div class="recall-entry"><label for="recallInput">我记得的意思</label><textarea id="recallInput" rows="2" maxlength="500" autocomplete="off" placeholder="例如：坚持做某事；暂时说不准的部分也可以写下"></textarea><p class="hint" id="recallValidation" aria-live="polite">不要求与词典逐字一致，核对意思是否准确。</p></div>'+
+    '<div class="row recall-actions"><button id="btnSay">🔊 发音</button><button id="btnRecallHint">给我原句提示</button><button class="primary big" id="btnReveal">提交，核对意思</button><button id="btnRecallSkip">想不起来，重新学</button></div>'+
+    '<div id="recallHint" class="hint" hidden></div><div id="recallAnswer" hidden></div><div id="recallRating" class="recall-ratings" hidden>'+
+    '<button id="btnRecallAgain">意思不对</button><button id="btnRecallHard">只写对一部分</button><button class="primary" id="btnRecallGood">意思准确</button></div>'+
+    '<div class="feedback" id="feedback" aria-live="polite"></div><div class="row recall-actions"><button class="primary" id="btnNext" hidden>下一词 →</button></div></div></div>';
   bindQuit();$('btnSay').onclick=function(){ER.speak(v.word,v.audio);};
+  var inp=$('recallInput');inp.value=it.response||'';
+  inp.oninput=function(){if(!it.revealed){it.response=inp.value;saveSession();}};
   function hint(){
-    it.assisted=true;var sent=resolveSentence(v);$('recallHint').hidden=false;$('recallHint').textContent=sent?sent.en:'这个词暂时没有原句，点击「看答案」重新学习。';
-    $('btnRecallHint').disabled=true;$('btnRecallGood').textContent='提示后想起来了';saveSession();
+    it.assisted=true;it.hintUsed=true;var sent=resolveSentence(v);$('recallHint').hidden=false;$('recallHint').textContent=sent?sent.en:'暂无可用原句，可以点「想不起来，重新学」。';
+    $('btnRecallHint').disabled=true;$('btnRecallGood').textContent='提示后写对';saveSession();
   }
-  function reveal(){
-    it.revealed=true;$('recallAnswer').innerHTML=correctionHtml(v);$('recallAnswer').hidden=false;$('recallRating').hidden=false;
-    $('btnReveal').hidden=true;$('btnRecallHint').disabled=true;saveSession();
+  function reveal(skip){
+    if(!it.revealed&&!skip){
+      var text=inp.value.trim();
+      if(!/[\p{L}\p{N}]/u.test(text)||normPhrase(text)===normPhrase(v.word)){
+        $('recallValidation').textContent='先写出你理解的意思；想不起来可以直接选「重新学」。';inp.focus();return;
+      }
+      it.response=text;
+    }
+    it.revealed=true;inp.readOnly=true;
+    box.querySelector('.recall-entry').hidden=true;box.querySelector('.recall-instruction').hidden=true;
+    $('recallAnswer').innerHTML='<div class="recall-comparison"><b>揭晓前的答案</b><p>'+esc(it.response||'（没想起来）')+'</p></div>'+correctionHtml(v)+'<p class="hint">对照你的原答案核对核心意思。这是自评，不会自动判断中文同义表达。</p>';
+    $('recallAnswer').hidden=false;$('recallRating').hidden=!!skip;
+    $('btnReveal').hidden=true;$('btnRecallSkip').hidden=true;$('btnRecallHint').disabled=true;saveSession();
+    if(skip)grade(it,v,'again');
   }
-  $('btnRecallHint').onclick=hint;$('btnReveal').onclick=reveal;
-  if(it.assisted){if(it.recentExposure){$('recallHint').hidden=false;$('recallHint').textContent='刚刚看过这个词，本题算热身；隔开再测才计独立回忆。';$('btnRecallGood').textContent='这次想起来了';}else hint();}if(it.revealed)reveal();
+  $('btnRecallHint').onclick=hint;$('btnReveal').onclick=function(){reveal(false);};
+  $('btnRecallSkip').onclick=function(){if(!it.done){it.response=inp.value.trim();reveal(true);}};
+  inp.onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();if(!it.revealed)reveal(false);}};
+  if(it.hintUsed)hint();
+  else if(it.assisted){$('recallHint').hidden=false;$('recallHint').textContent=it.isNew?'今天刚学的词，本次是初练；明天再检验记忆。':'刚刚接触过这个词，本次是练习，不计独立掌握。';}
+  if(it.revealed)reveal(false);
   [['btnRecallGood','good'],['btnRecallHard','hard'],['btnRecallAgain','again']].forEach(function(a){$(a[0]).onclick=function(){
+    if(!it.revealed||it.done)return;
     Array.prototype.forEach.call($('recallRating').querySelectorAll('button'),function(b){b.disabled=true;});grade(it,v,a[1]);
   };});
 }
@@ -356,13 +389,22 @@ function clozeBlank(v, sentEn){
   var seen={}, list=[];
   cands.forEach(function(c){ var k=c.toLowerCase(); if(!k||seen[k]) return; seen[k]=1; list.push(c); });
   list.sort(function(a,b){ return b.length-a.length; });
+  function maskOtherOccurrences(text){
+    var re=new RegExp('(^|[^A-Za-z])('+list.map(function(x){return x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}).join('|')+')(?![A-Za-z])','gi');
+    var out='',pos=0;
+    text.replace(re,function(all,before,word,offset){
+      out+=esc(text.slice(pos,offset+before.length))+'<span class="cloze-echo">〔同词〕</span>';pos=offset+all.length;
+      return all;
+    });
+    return out+esc(text.slice(pos));
+  }
   for(var i=0;i<list.length;i++){
     var form=list[i];
     var re=new RegExp('(^|[^A-Za-z])('+form.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')(?![A-Za-z])','i');
     var m=re.exec(en);
     if(m){
       var start=m.index+m[1].length, end=start+m[2].length, surface=m[2];
-      var blankHtml=esc(en.slice(0,start))+'<span class="cloze-blank" id="clozeBlank">______</span>'+esc(en.slice(end));
+      var blankHtml=maskOtherOccurrences(en.slice(0,start))+'<span class="cloze-blank" id="clozeBlank">______</span>'+maskOtherOccurrences(en.slice(end));
       return {form:surface, start:start, end:end, html:blankHtml, accept:surface};
     }
   }
@@ -436,13 +478,12 @@ function pickType(v,it){
     if(sent&&clozeBlank(v,sent.en))return 'cloze';
     return 'context';
   }
-  // An occasional recognition question checks self-rating, but never counts as independent recall.
-  if(it.first&&!it.isNew&&(v.srs.history||[]).filter(function(e){return e.skill==='meaning'&&e.first&&e.self;}).length>=3&&(v.srs.skills.meaning.reps+SRS.hash(v.word))%4===3&&distractors(v,'zh',3).length>=2) return 'en2zh';
   return 'recall';
 }
 function checkExposure(it){
   if(it.exposureChecked)return;
   it.exposureChecked=true;
+  if(it.isNew)it.assisted=true;
   var last=S.exposures&&S.exposures['word:'+it.word];
   if(last==null)return;
   var other=Object.create(null);
@@ -627,49 +668,61 @@ function renderContext(it,v){
   // Missing/edited examples must not accidentally grade the meaning track as usage.
   it.type='context';var sent=resolveSentence(v);
   box.innerHTML='<div class="card">'+progressHtml()+'<div class="qcard" id="qCard" data-type="context"><span class="qtype">语境待补充</span>'+correctionHtml(v)+'<p class="hint">'+(sent?'原句未匹配到这个词，请在生词本笔记中检查词形。':'这个词暂无可用例句，先练词义。')+'</p><button class="primary" id="btnSkipContext">暂缓语境题</button></div></div>';
-  bindQuit();$('btnSkipContext').onclick=function(){it.done=true;v.srs.skills.usage.due=SRS.addDays(today(),1);v.srs=SRS.normalize(v.srs,today());ER.saveVocab();saveSession();advance();};
+  bindQuit();$('btnSkipContext').onclick=function(){
+    it.done=true;['meaning','usage','spelling'].forEach(function(k){var sk=v.srs.skills[k];if(sk.active&&sk.due<=today())sk.due=SRS.addDays(today(),1);});
+    v.srs=SRS.normalize(v.srs,today());ER.saveVocab();saveSession();advance();
+  };
 }
-function scheduleRetry(it,target){
-  if(target.attempts>=MAX_ATTEMPTS){target.reason='已到本轮上限';return false;}
-  var pos=S.idx+1,others=Object.create(null);
-  while(pos<S.queue.length&&Object.keys(others).length<RETRY_GAP){
-    var q=S.queue[pos];if(!q.done&&q.word!==it.word)others[q.word]=1;pos++;
-  }
-  if(Object.keys(others).length<RETRY_GAP){target.reason='本轮间隔不足';return false;}
-  S.queue.splice(pos,0,{kind:'test',word:it.word,skill:it.skill,first:false,retry:(it.retry||0)+1,isNew:it.isNew,
-    keepType:it.skill==='meaning'?'recall':it.type==='order'?'spell':it.type});return true;
+function prepareRetries(){
+  S.retriesPrepared=true;
+  // Build one final batch only after all first attempts. Retries never create retries.
+  S.queue.slice(0,S.mainEnd).forEach(function(it,index){
+    if(it.kind!=='test'||!it.done||it.isNew)return;
+    var target=S.targets[targetKey(it)];
+    if(!target||target.done)return;
+    var others=Object.create(null);
+    for(var j=index+1;j<S.mainEnd;j++){var q=S.queue[j];if(q.done&&q.word!==it.word)others[q.word]=true;}
+    if(Object.keys(others).length<RETRY_GAP){target.reason='与上次出现间隔不足 8 个词';return;}
+    S.queue.push({kind:'test',word:it.word,skill:it.skill,first:false,retry:1,isNew:false,keepType:it.skill==='meaning'?'recall':it.type==='order'?'spell':it.type});
+  });
+  saveSession();
+}
+function renderRetryIntro(){
+  box.innerHTML='<div class="card" id="retryIntro"><h2>这一轮的单词已全部测完</h2><p>还有 '+(S.queue.length-S.mainEnd)+' 个错词可以补练。每词只练一次，完成后结束；明天仍会再验证。</p><p class="hint">补练与上次出现至少隔开 8 个不同词，结果不替代首次测试。</p><div class="row"><button class="primary" id="btnStartRetry">补练这些错词</button><button id="btnFinishReview">今天先到这里</button></div></div>';
+  $('btnStartRetry').onclick=function(){S.retryStarted=true;saveSession();next();};
+  $('btnFinishReview').onclick=function(){summary(false);};
 }
 function grade(it,v,result){
   if(it.done||!S)return;
   it.done=true;
   var rating=typeof result==='string'?result:result?'good':'again';
-  var independent=rating==='good'&&!it.assisted;
-  var key=targetKey(it),target=S.targets[key]||(S.targets[key]={word:v.word,skill:it.skill,attempts:0,streak:0,required:!!it.isNew||!!v.srs.skills[it.skill].learningPending||['again','hard'].indexOf(v.srs.skills[it.skill].lastRating)>=0,done:false});
+  var unassisted=rating==='good'&&!it.assisted,independent=unassisted&&it.first;
+  var key=targetKey(it),target=S.targets[key]||(S.targets[key]={word:v.word,skill:it.skill,attempts:0,done:false});
   target.attempts++;
-  if(independent)target.streak++;else{target.streak=0;target.required=true;}
-  target.done=independent&&(!target.required||target.streak>=2);
-  v.srs=SRS.record(v.srs,{skill:it.skill,rating:rating,date:today(),assisted:!!it.assisted,practice:!it.first,self:it.type==='recall'});
+  // A correction never replaces the first answer; tomorrow's cold success clears pending.
+  if(it.first)target.done=independent;
+  v.srs=SRS.record(v.srs,{skill:it.skill,rating:rating,date:today(),assisted:!!it.assisted,practice:!it.first,self:it.type==='recall',response:it.response,task:it.type});
   v.srs.skills[it.skill].learningPending=!target.done;
-  var queued=false;
-  if(!target.done){
-    queued=scheduleRetry(it,target);
-    // Unfinished learning stays due tomorrow even if the first attempt was correct.
-    var track=v.srs.skills[it.skill],tomorrow=SRS.addDays(today(),1);
-    if(track.due>tomorrow)track.due=tomorrow;
-    v.srs=SRS.normalize(v.srs,today());
-  }
+  var tomorrow=SRS.addDays(today(),1),track=v.srs.skills[it.skill];
+  if(!target.done&&track.due>tomorrow)track.due=tomorrow;
   if(it.first){
+    // Other abilities are scheduled on another day, with no invented answer or promotion.
+    ['meaning','usage','spelling'].forEach(function(k){if(k!==it.skill&&v.srs.skills[k].active&&v.srs.skills[k].due<=today())v.srs.skills[k].due=tomorrow;});
+    var sent=resolveSentence(v);
+    if(!v.srs.skills.usage.active&&sent&&clozeBlank(v,sent.en)){v.srs.skills.usage.active=true;v.srs.skills.usage.due=tomorrow;}
+    if(balanced()&&!v.srs.skills.spelling.active){v.srs.skills.spelling.active=true;v.srs.skills.spelling.due=tomorrow;}
     if(independent){S.correct++;if(S.advanced.indexOf(v.word)<0)S.advanced.push(v.word);}
-    else if(rating==='good'){S.assisted++;}
-    else {S.wrong++;if(S.reset.indexOf(v.word)<0)S.reset.push(v.word);}
-  }else if(independent)S.retryOk++;
+    else if(rating==='good')S.assisted++;
+    else{S.wrong++;if(S.reset.indexOf(v.word)<0)S.reset.push(v.word);}
+  }else if(unassisted)S.retryOk++;
+  v.srs=SRS.normalize(v.srs,today());
   S.exposures=S.exposures||{};S.exposures['word:'+v.word]=S.idx;
   var live=ER.findWord(v.word);if(live&&live!==v)live.srs=v.srs;
   ER.saveVocab();saveSession();
-  var fb=$('feedback');fb.className='feedback '+(independent?'ok':rating==='again'?'bad':'');
-  var title=independent?(it.type==='recall'?'✓ 已记录：独立想起（自评）':'✓ 无提示答对'):rating==='good'?(it.recentExposure?'刚看过后答对 · 不计独立通过':'有提示答对 · 不计独立通过'):rating==='hard'?'还不够稳 · 已加入加强':'没关系，先把这次记清楚';
+  var fb=$('feedback');fb.className='feedback '+(unassisted?'ok':rating==='again'?'bad':'');
+  var title=independent?(it.type==='recall'?'✓ 已记录：写出意思并核对准确（自评）':'✓ 无提示答对'):rating==='good'?(!it.first?'✓ 本次补练答对 · 明天仍需验证':it.isNew?'✓ 完成新词初练 · 明天再验证':'提示后答对 · 不计独立通过'):rating==='hard'?'只记住了一部分 · 明天再验证':'先看清意思和用法，明天再试';
   fb.innerHTML='<b>'+title+'</b>'+(it.type==='recall'?'':correctionHtml(v,it))+
-    '<p class="hint">'+(target.done?(target.required?'本轮已完成两次隔开回忆。':'')+SKILL_NAME[it.skill]+'下次验证：'+esc(v.srs.skills[it.skill].due):queued?'稍后隔开至少 3 个其他词再练，目标是两次独立想起。':(target.reason||'仍需加强')+'，已留待明天继续。')+'</p>';
+    '<p class="hint">'+(target.done?SKILL_NAME[it.skill]+'下次验证：'+esc(track.due):!it.first?'本词今日练习结束，不再循环。':it.isNew?'今天先到这里，明天隐藏答案再测。':'先继续其他词；本轮结束后，间隔足够的错词可选补练一次。')+'</p>';
   var dont=$('btnDontKnow');if(dont)dont.hidden=true;
   var nb=$('btnNext');nb.disabled=false;nb.hidden=false;nb.onclick=advance;
 }
@@ -677,9 +730,9 @@ function summary(early){
   if(!S)return renderHome();
   var state=S,c=counts(),pending=Object.keys(S.targets).map(function(k){return S.targets[k];}).filter(function(x){return !x.done;}),completed=Object.keys(S.targets).map(function(k){return S.targets[k];}).filter(function(x){return x.done;});
   if(!early)clearSession();
-  var h='<div class="card" id="summaryCard"><h2 style="margin:0 0 6px;font-size:20px">'+(early?'本轮已暂停，可继续':'今天又多记住了一点')+'</h2>'+
-    '<p class="hint">今天通过只是第一步，隔天还能想起才更稳。词义自评与客观练习分别保存在记录中。</p><div class="stats">'+
-    '<div class="stat"><b id="sumCorrect">'+S.correct+'</b>首次无提示通过</div><div class="stat"><b>'+S.assisted+'</b>提示后答对</div><div class="stat"><b id="sumWrong">'+S.wrong+'</b>首次模糊 / 忘记</div><div class="stat"><b>'+S.learned.length+'</b>初步学习的新词</div></div>';
+  var h='<div class="card" id="summaryCard"><h2 style="margin:0 0 6px;font-size:20px">'+(early?'本轮已暂停，可继续':'本轮完成，不再循环')+'</h2>'+
+    '<p class="hint">每个词只做一次正式测试。错词和新词明天再验证；当天补练不会覆盖首次结果。</p><div class="stats">'+
+    '<div class="stat"><b id="sumCorrect">'+S.correct+'</b>独立完成（含词义自评）</div><div class="stat"><b>'+S.assisted+'</b>初练 / 提示后答对</div><div class="stat"><b id="sumWrong">'+S.wrong+'</b>首次模糊 / 忘记</div><div class="stat"><b>'+S.learned.length+'</b>初步学习的新词</div></div>';
   if(completed.length)h+='<p><b>本轮已通过</b></p><div class="pill-list ok">'+completed.map(function(x){return '<span>'+esc(x.word)+' · '+SKILL_NAME[x.skill]+'</span>';}).join('')+'</div>';
   if(pending.length)h+='<p><b>仍需加强'+(early?'':'，明天再验证')+'</b></p><div class="pill-list" id="sumReset">'+pending.map(function(x){return '<span>'+esc(x.word)+' · '+SKILL_NAME[x.skill]+'</span>';}).join('')+'</div>';
   if(S.known.length)h+='<p class="hint">已保留低频抽查：'+S.known.map(esc).join('、')+'</p>';
