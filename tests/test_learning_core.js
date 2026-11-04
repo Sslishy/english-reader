@@ -18,9 +18,18 @@ test('cached teaching phrases support lists, subheadings and multiline meanings'
  const lesson='## 实用短语\n- **"climate change"**：气候变化；用于讨论环境。\n  新例句：Climate change matters.\n\n### 2. puts pressure on\n- 此处意思：对……施加压力\n- 使用场景：表达压力。\n\n3. `health care` - 医疗服务\n4. air-quality rules：空气质量法规\n## 迁移提示\n- **more words**：不能收进短语。';
  assert.deepEqual(C.sentencePhrases(lesson,source).map(x=>[x.word,x.zh]),[['climate change','气候变化'],['puts pressure on','对……施加压力'],['health care','医疗服务'],['air-quality rules','空气质量法规']]);
 });
-test('phrase collection rejects invented phrases, missing meanings, partial words and duplicates',()=>{
+test('phrase collection preserves taught expressions while rejecting missing meanings, markup and duplicates',()=>{
  const lesson='## 实用短语\n- **climate change**：气候变化\n- **Climate Change**：重复\n- **change policy**：虚构短语\n- **health care**\n  新例句：Health care helps us.\n- **air quality**：<img src=x>空气质量\n## 迁移提示\n- **new rules**：其他段落';
- assert.deepEqual(C.sentencePhrases(lesson,'Climate change policyholders need health care and air quality.').map(x=>x.word),['climate change']);
+ assert.deepEqual(C.sentencePhrases(lesson,'Climate change policyholders need health care and air quality.').map(x=>x.word),['climate change','change policy']);
+});
+test('all three screenshot phrases are collectible even when templates differ from the source',()=>{
+ const fixture=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures/coach-phrase-templates.json')));
+ const phrases=C.sentencePhrases(fixture.lesson,fixture.source);
+ assert.deepEqual(phrases.map(p=>p.word),['be shut out of sth','in the age of','from A to B']);
+ assert(phrases[0].block.includes('Without a bank account'));
+ assert(phrases[2].block.includes('from grammar to writing'));
+ assert(phrases.every(p=>!p.zh.includes('新例句')));
+ assert.equal(C.sentencePhrases('## 实用短语\n- **be shut out of sth.**：被排除在外',fixture.source)[0].word,'be shut out of sth.');
 });
 test('known inflected forms reduce uncertainty without treating all vocabulary as known',()=>{let m=C.analyze({paragraphs:['Workers restored habitats.']},{restore:true},w=>w==='restored'?['restored','restore']:[w]);assert(m.known.includes('restored'));assert(m.unrated.includes('habitats'));});
 console.log(n+' learning core tests passed');

@@ -10,7 +10,7 @@ var SYSTEM=[
 '## 参考译文\n给出这一句完整自然的中文译文，不能把整段中文当作本句译文；数字、单位、否定和比较关系准确保留。',
 '## 句子主干\n指出主语、谓语、宾语或表语，用英文原片段对应中文；补充主要修饰成分修饰谁。没有的成分不要硬套。',
 '## 翻译顺序\n用编号列出具体顺序，每步格式为「英文原片段 → 中文表达；为什么先译或后译这一部分」。最后说明如何合并，避免只泛泛说“先主干后修饰”。可顺译就直说，不要强行倒装。',
-'## 实用短语\n选择这句里真正出现且可复用的 1–3 个搭配，每项另起一行，严格写为「- **原文英文短语**：此处中文意思；用于……」。英文必须保留原句中的完整连续词组和词形，不要改成原形或带省略号的模板。可在下一行给一个简短英汉例句，并明确标为“新例句”。没有值得记忆的短语就说明，不要凑数或编造原文。',
+'## 实用短语\n选择与本句表达直接相关、可复用的 1–3 个搭配，每项另起一行，写为「- **英文短语或搭配模板**：此处中文意思；用于……」。允许标准搭配和 sb. / sth.、from A to B 等模板，但要说明它们对应原句的哪种用法，不要把模板或新例句冒充原文。可给一个简短英汉例句，明确标为“新例句”。没有值得记忆的短语就说明，不要凑数。',
 '## 迁移提示\n指出一个下次遇到类似句子可用的方法，以及本句最容易理解错的一点。',
 '不要输出 HTML，不要要求学生先提供自己的译文，不要重复整段原文。'
 ].join('\n');
@@ -101,7 +101,7 @@ $('articleBox').addEventListener('click',function(e){
   else if(key==='coachPhrase'){
     var savedLesson=cached(a,s),phrase=savedLesson&&!savedLesson.truncated&&C.sentencePhrases(savedLesson.lesson,s.text)[+b.dataset.phraseIndex];
     if(!phrase||busy[id(a,s)])return;
-    if(!ER.findWord(phrase.word))ER.addWord({word:phrase.word,type:'phrase',zh:phrase.zh,sentence:s.text,sentence_zh:savedLesson.translation||'',source:'reading',article:a.date,note:'来自逐句 AI 翻译讲解'});
+    if(!ER.findWord(phrase.word))ER.addWord({word:phrase.word,type:'phrase',zh:phrase.zh,sentence:s.text,sentence_zh:savedLesson.translation||'',source:'reading',article:a.date,note:'来自逐句 AI 翻译讲解\n'+phrase.block.replace(/\*\*|`/g,'')});
     ER.toast('「'+phrase.word+'」已加入生词本');ER.refreshSentenceLessons();
   }
   else{var r=cached(a,s);if(r&&r.translation){ER.addSentencePractice(a,s,r.translation);ER.toast('已加入明天复译。');paint(a,s);}}
