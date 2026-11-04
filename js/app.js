@@ -268,14 +268,14 @@ ER.fmtIpa = function(p){ p=String(p||'').trim(); if(!p) return ''; return /^[\/\
 /* ========== 分词渲染 ========== */
 var WORD_RE = /[A-Za-z]+(?:['’\-][A-Za-z]+)*/g;
 function tokenize(p){
-  var sents = p.match(/[^.!?。！？]+[.!?。！？]+["'”’)\]]*\s*|[^.!?。！？]+$/g) || [p];
+  var sents = window.LearningCore ? LearningCore.sentences({paragraphs:[p]}).map(function(x){return x.text;}) : [p];
   return sents.map(function(s){
     var out='',last=0; s.replace(WORD_RE,function(m,off){
       out+=esc(s.slice(last,off))+'<span class="w" data-w="'+esc(m.toLowerCase().replace(/’/g,"'"))+'">'+esc(m)+'</span>';
       last=off+m.length; return m;});
     out+=esc(s.slice(last));
     return '<span class="sent">'+out+'</span>';
-  }).join('');
+  }).join(' ');
 }
 function renderReader(text, el){
   var paras = text.replace(/\r/g,'').split(/\n\s*\n|\n/).map(function(p){return p.trim();}).filter(Boolean);
@@ -314,22 +314,22 @@ function showArticle(date){
 function renderArticle(a, isNewest){
   var h='<div class="card">', zh=paraZh(a), shown=zhState(a);
   h+='<div class="art-meta"><span class="tag">'+(isNewest?'今日阅读':'往期')+' · '+esc(a.date)+'</span><span class="tag">'+esc(a.level||'')+'</span><span>'+wordCount(a)+' 词</span>'+
-     (zh?'<button type="button" id="btnZhAll" class="zh-all" aria-pressed="false" title="显示 / 隐藏全部段落的中文译文（也可以点每段末尾的「译」只看一段）">全文对照</button>':'')+'</div>';
+     (zh?'<button type="button" id="btnZhAll" class="zh-all" aria-pressed="false" title="显示 / 隐藏全部段落的中文译文（也可以点每段末尾的「整段对照」只看一段）">全文对照</button>':'')+'</div>';
   h+='<div id="listenPanel"></div>';
   h+='<article class="reader" id="articleReader"><h2>'+tokenize(a.title)+'</h2>';
   h+='<div class="art-title-zh">'+esc(a.title_zh||'')+'</div>';
   h+='<details class="summary"><summary>中文导读（建议读完英文后再看）</summary><div style="margin-top:6px;font-family:-apple-system,\'PingFang SC\',sans-serif;font-size:15px;line-height:1.7">'+esc(a.summary_zh||'')+'</div></details>';
-  var tp=!!ER.practiceBox;
+  var ss=LearningCore.sentences(a);
   (a.paragraphs||[]).forEach(function(p,i){
-    h+='<p data-pi="'+i+'">'+tokenize(p)+
-       (zh?'<button type="button" class="zh-btn" data-zh="'+i+'" aria-controls="pzh'+i+'" aria-expanded="'+(shown[i]?'true':'false')+'" title="显示 / 隐藏本段中文译文">译</button>':'')+
-       (tp?ER.practiceButton(a,i):'')+'</p>';
-    if(zh) h+='<div class="para-zh" id="pzh'+i+'" lang="zh-CN"'+(shown[i]?'':' hidden')+'>'+esc(zh[i])+'</div>';
-    if(tp) h+=ER.practiceBox(a,i);
+    h+='<div class="article-paragraph" data-pi="'+i+'">';
+    ss.filter(function(x){return x.paragraph===i;}).forEach(function(x){h+=ER.sentenceCoachHtml?ER.sentenceCoachHtml(a,x,tokenize(x.text)):'<p>'+tokenize(x.text)+'</p>';});
+    h+=(zh?'<button type="button" class="zh-btn" data-zh="'+i+'" aria-controls="pzh'+i+'" aria-expanded="'+(shown[i]?'true':'false')+'" title="显示 / 隐藏本段中文译文">整段对照</button>':'')+'</div>';
+    if(zh)h+='<div class="para-zh" id="pzh'+i+'" lang="zh-CN"'+(shown[i]?'':' hidden')+'>'+esc(zh[i])+'</div>';
+    if(ER.legacyTranslationHtml)h+=ER.legacyTranslationHtml(a,i);
   });
   h+='</article>';
   h+='<p class="hint">来源：<a href="'+esc(a.source_url)+'" target="_blank" rel="noopener">'+esc(a.source_name||a.source_url)+'</a>（本文为根据该报道改写的原创学习文章）</p>';
-  h+='<p class="hint">'+READ_HINT+(zh?' · 点段末「译」或上方「全文对照」看整段中文译文（AI 逐段精译，建议先自己读懂再对照）':'')+' · 点「我来翻译」自己译这一段，提交后由 DeepSeek AI 批改'+'</p></div>';
+  h+='<p class="hint">'+READ_HINT+(zh?' · 点段末「整段对照」或上方「全文对照」看整段中文译文（AI 逐段精译，建议先自己读懂再对照）':'')+' · 每句末尾点「翻译·讲解」，学习翻译顺序、结构和短语；Alt + ↑ / ↓ 切换句子，Alt + T 展开讲解'+'</p></div>';
   if(ER.learningArticleHtml) h+=ER.learningArticleHtml(a);
   if(a.key_words&&a.key_words.length){
     h+='<div class="card"><h3 class="card-title">🔑 重点词汇</h3><div class="kw-list">';
@@ -344,7 +344,7 @@ function renderArticle(a, isNewest){
   $('articleBox').innerHTML=h;
   syncZhAll();
   refreshHighlights();
-  if(ER.practiceAfterRender) ER.practiceAfterRender();
+  if(ER.sentenceCoachAfterRender) ER.sentenceCoachAfterRender(a);
   if(ER.learningAfterRender) ER.learningAfterRender(a);
 }
 /* ========== 整段中文译文（paragraphs_zh，可选） ========== */
@@ -845,6 +845,7 @@ function translateText(text){
   }
   return next();
 }
+ER.translateSentenceText = function(text,retry){if(retry)resetTranslators();return translateText(text);};
 function resetTranslators(){ trDown={}; myMemoryQuotaOut=false; }
 
 /* 本文短语表 / 重点词：在线翻译之前先查（忽略大小写和标点；选区包含或被包含于某个短语也给出提示） */
@@ -1074,7 +1075,7 @@ function snapRange(r0){
   if(ew){ if(r.endContainer.nodeType===3&&r.endOffset===0&&sw!==ew) r.setEndBefore(ew); else r.setEndAfter(ew); }
   return r;
 }
-var ZH_SKIP='.para-zh,.zh-btn,.tp-btn,.tp';
+var ZH_SKIP='.para-zh,.zh-btn,.tp-btn,.tp,.coach-btn,.coach-panel,.legacy-translation';
 function inZh(n){ var e=n&&(n.nodeType===1?n:n.parentElement); return !!(e&&e.closest&&e.closest(ZH_SKIP)); }
 /* 选区文字（跳过跨段选择时夹在中间的中文译文和「译」按钮） */
 function rangeText(r){

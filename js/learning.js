@@ -2,12 +2,13 @@
 (function(){
 'use strict';
 var ER=window.ER,C=window.LearningCore,$=ER.$,esc=ER.esc,KEY='er_learning';
-function read(){var x=ER.lsGet(KEY,{}),out=Object.create(null);if(x&&typeof x==='object'&&!Array.isArray(x))Object.keys(x).forEach(function(k){if(/^(quiz|drill|listen|known|lookup|fit):/.test(k)&&x[k]&&typeof x[k]==='object')out[k]=x[k];});return out;}
+function read(){var x=ER.lsGet(KEY,{}),out=Object.create(null);if(x&&typeof x==='object'&&!Array.isArray(x))Object.keys(x).forEach(function(k){if(/^(quiz|drill|listen|known|lookup|fit|lesson):/.test(k)&&x[k]&&typeof x[k]==='object')out[k]=x[k];});return out;}
 var records=read();
-function merge(other){var changed=false;if(!other||typeof other!=='object'||Array.isArray(other))return false;Object.keys(other).forEach(function(k){var v=other[k];if(!/^(quiz|drill|listen|known|lookup|fit):/.test(k)||!v||typeof v!=='object')return;if(!records[k]||(+v.updatedAt||0)>(+records[k].updatedAt||0)){records[k]=v;changed=true;}});return changed;}
+function merge(other){var changed=false;if(!other||typeof other!=='object'||Array.isArray(other))return false;Object.keys(other).forEach(function(k){var v=other[k];if(!/^(quiz|drill|listen|known|lookup|fit|lesson):/.test(k)||!v||typeof v!=='object')return;if(!records[k]||(+v.updatedAt||0)>(+records[k].updatedAt||0)){records[k]=v;changed=true;}});return changed;}
 function put(id,patch){merge(read());var prev=records[id]||{};records[id]=Object.assign({},prev,patch,{updatedAt:Math.max(Date.now(),(+prev.updatedAt||0)+1)});ER.lsSet(KEY,records);if(ER.syncSoon)ER.syncSoon();return records[id];}
+ER.saveLearningRecord=put;
 ER.getLearningState=function(){merge(read());return records;};
-ER.mergeLearningState=function(other,replace){if(replace)records=Object.create(null);if(merge(other)||replace)ER.lsSet(KEY,records);if(ER.currentTab==='review'&&!activeDrill)renderDrills();if(ER.currentTab==='read'&&article())renderRecommendations();};
+ER.mergeLearningState=function(other,replace){if(replace)records=Object.create(null);if(merge(other)||replace)ER.lsSet(KEY,records);if(ER.currentTab==='review'&&!activeDrill)renderDrills();if(ER.currentTab==='read'&&article()){renderRecommendations();if(ER.refreshSentenceLessons)ER.refreshSentenceLessons();}};
 window.addEventListener('storage',function(e){if(e.key===KEY||e.key===null){records=read();if(ER.currentTab==='review'&&!activeDrill)renderDrills();}});
 function article(){return ER.currentArticle&&ER.currentArticle();}
 function quizId(a,q){return 'quiz:'+a.date+':'+q.id;}
@@ -114,6 +115,7 @@ function addDrill(a,i,x){
   if(old&&old.answer===x.answer&&old.issue===x.issue)return false;
   put(id,{type:'drill',article:a.date,paragraph:i,original:x.original,answer:x.answer,issue:x.issue,category:x.category||C.category(x.issue),due:SRS.addDays(ER.today(),1),added:old&&old.added||ER.today(),stage:0,last:'',draft:'',attempts:old&&old.attempts||0});return true;
 }
+ER.addSentencePractice=function(a,s,answer){addDrill(a,s.paragraph,{original:s.text,answer:answer,issue:'按讲解中的主干和语序重新翻译，留意实用短语。',category:'句子结构'});};
 ER.captureTranslationMistakes=function(a,i,feedback){var items=C.extract(feedback,a.paragraphs[i]),n=0;items.forEach(function(x){if(addDrill(a,i,x))n++;});return {found:items.length,added:n};};
 ER.translationDrillControls=function(a,i,e){
   if(!e||!e.fb)return '';
@@ -125,8 +127,8 @@ function drillEntries(){return Object.keys(records).filter(function(k){var x=rec
 function renderDrills(){
   var host=$('translationReviewBox');if(!host)return;
   var all=drillEntries(),due=all.filter(function(x){return x.data.due<=ER.today();});
-  host.innerHTML='<section class="card"><div class="learning-heading"><h3>翻译错题复练</h3><span>'+due.length+' 项到期 · 共 '+all.length+' 项</span></div><p class="hint">把批改里的问题句重新译一遍，再对照改法。新错题从第二天开始，先自己想，再看提示。</p>'+
-    (due.length?'<button class="primary" id="btnStartDrills">开始今天的错题复练</button>':all.length?'<p class="hint">下一次：'+esc(all[0].data.due)+'</p>':'<p class="hint">在阅读页使用「我来翻译」，批改后会自动提取有明确原句和改法的错误；也可手动保存。</p>')+'<div id="drillExercise"></div></section>';
+  host.innerHTML='<section class="card"><div class="learning-heading"><h3>翻译复练</h3><span>'+due.length+' 项到期 · 共 '+all.length+' 项</span></div><p class="hint">把保存的句子重新译一遍，再对照参考译文。从第二天开始，先自己想，再看提示。</p>'+
+    (due.length?'<button class="primary" id="btnStartDrills">开始今天的错题复练</button>':all.length?'<p class="hint">下一次：'+esc(all[0].data.due)+'</p>':'<p class="hint">在阅读页打开逐句「翻译·讲解」，点「加入明天复译」；以前保存的错题也会保留。</p>')+'<div id="drillExercise"></div></section>';
   if($('btnStartDrills'))$('btnStartDrills').onclick=function(){activeDrill=due[0].id;drillRevealed=false;drillHinted=records[activeDrill].exposedOn===ER.today();drillGraded=false;renderDrill();};
 }
 function renderDrill(){
@@ -135,7 +137,7 @@ function renderDrill(){
   host.innerHTML='<div class="drill-card"><span class="tag">'+esc(d.category)+'</span><p class="drill-original">'+esc(d.original)+'</p><label for="drillTranslation">重新写出中文译文</label><textarea id="drillTranslation" rows="3" maxlength="1500"'+(drillGraded?' disabled':'')+'>'+esc(d.draft||'')+'</textarea>'+
     '<div class="row"><button id="btnDrillHint"'+(drillRevealed?' disabled':'')+'>提示这次要注意什么</button><button class="primary" id="btnRevealDrill"'+(drillRevealed?' hidden':'')+'>写好了，查看对照</button></div>'+
     (drillHinted?'<p class="hint">'+esc(tips[d.category]||tips['词义与搭配'])+'</p>':'')+
-    (drillRevealed?'<div class="drill-answer"><p><b>原来的问题：</b>'+esc(d.issue)+'</p><p><b>参考改法：</b>'+esc(d.answer)+'</p><p class="hint">意思准确的其他译法也可以。下面是自评，不是 AI 自动判分。</p></div><div class="row"><button id="btnDrillAgain"'+(drillGraded?' disabled':'')+'>仍需练习</button><button class="primary" id="btnDrillGood"'+(drillGraded?' disabled':'')+'>'+(drillHinted?'提示后想通了':'独立想通了')+'</button></div>':'')+
+    (drillRevealed?'<div class="drill-answer"><p><b>复译要点：</b>'+esc(d.issue)+'</p><p><b>参考改法：</b>'+esc(d.answer)+'</p><p class="hint">意思准确的其他译法也可以。下面是自评，不是 AI 自动判分。</p></div><div class="row"><button id="btnDrillAgain"'+(drillGraded?' disabled':'')+'>仍需练习</button><button class="primary" id="btnDrillGood"'+(drillGraded?' disabled':'')+'>'+(drillHinted?'提示后想通了':'独立想通了')+'</button></div>':'')+
     '<p id="drillStatus" class="hint" aria-live="polite"></p><button id="btnNextDrill"'+(drillGraded?'':' hidden')+'>下一项 / 完成</button></div>';
   $('drillTranslation').oninput=function(){put(activeDrill,{draft:this.value});};
   $('btnDrillHint').onclick=function(){drillHinted=true;put(activeDrill,{exposedOn:ER.today()});renderDrill();};

@@ -199,7 +199,7 @@ with sync_playwright() as p:
     check('context hides repeated target forms instead of leaking the answer', 'contribute' not in repeated.lower() and repeated.count('id=\"clozeBlank\"')==1 and '〔同词〕' in repeated)
     check('usage prompt blanks inflected form', item(page)['type'] == 'cloze' and item(page)['answer'].lower() == 'contributed')
     step(page)
-    check('usage success records separate ability', word(page, 'contribute')['srs']['history'][-1]['skill'] == 'usage')
+    check('Chinese-supported production records usage without treating the normal cue as a penalty', word(page, 'contribute')['srs']['history'][-1]['skill'] == 'usage' and word(page, 'contribute')['srs']['history'][-1]['task']=='cloze_zh' and not word(page, 'contribute')['srs']['history'][-1]['assisted'])
 
     # Different abilities are spread over days, not three prompts for one word.
     seed(page, [old('resilience', '韧性；恢复力')], mode='balanced')
@@ -225,10 +225,10 @@ with sync_playwright() as p:
       v.srs.skills.meaning.due='2026-11-15';v.srs.skills.usage=Object.assign({},v.srs.skills.meaning,{stage:1,active:true,due:ER.today()});
       v.srs=SRS.normalize(v.srs,ER.today());ER.saveVocab();ER.views.review.show();}""")
     start(page)
-    check('cold cloze hides Chinese until requested', not page.locator('#clozeZh').is_visible())
+    check('cloze includes Chinese meaning as a normal prompt', page.locator('#clozeZh').is_visible() and '贡献' in page.inner_text('#clozeZh'))
     page.click('#btnClozeHint')
     step(page)
-    check('cloze Chinese hint cannot promote usage', word(page,'contribute')['srs']['skills']['usage']['stage']==1 and word(page,'contribute')['srs']['history'][-1]['assisted'])
+    check('extra English-letter hint cannot promote usage', word(page,'contribute')['srs']['skills']['usage']['stage']==1 and word(page,'contribute')['srs']['history'][-1]['assisted'])
 
     seed(page,[old('withoutcontext')])
     page.evaluate("""()=>{var v=ER.findWord('withoutcontext');v.sentence='This sentence has no target.';
@@ -250,6 +250,53 @@ with sync_playwright() as p:
     step(page,'again')
     check('failed spot-check returns word to tomorrow strengthening', word(page,'resilience')['srs']['skills']['meaning']['due']=='2026-11-10' and word(page,'resilience')['srs']['skills']['meaning']['learningPending'])
     page.reload();page.wait_for_selector('#statDue')
+
+    # Chinese context is available without spending an extra hint.
+    seed(page,[dict(old('slip','逐渐远离；滑落'),sentence='5°C Goal Slips Away, but the Door Is Not Closed',article='2026-10-23')])
+    start(page);step(page)
+    check('old decimal-split title is repaired with Chinese context', 'The 1.5°C Goal Slips Away' in page.inner_text('#recallAnswer') and '标题中文' in page.inner_text('#recallAnswer') and '1.5' in page.inner_text('.context-zh'))
+    phr=page.evaluate("ER.clozeBlank({word:'premature deaths',type:'phrase'},'The plan reduced deaths, while rules cut premature deaths linked to pollution.')")
+    check('phrase cloze blanks the entire phrase and leaves unrelated occurrences intact', phr['accept']=='premature deaths' and 'reduced deaths' in phr['html'] and '〔同词〕' not in phr['html'])
+    check('partial phrase match cannot create an arbitrary one-word answer', page.evaluate("ER.clozeBlank({word:'premature deaths',type:'phrase'},'The plan reduced deaths.')") is None)
+
+    seed(page,[dict(old('localcontext','目标意思'),sentence_zh='')])
+    page.evaluate("ER.translateSentenceText=()=>Promise.resolve({zh:'他们昨天讨论了这个目标。',src:'test'})")
+    start(page);step(page);page.wait_for_function("document.querySelector('.context-zh').textContent.includes('他们昨天讨论了这个目标')")
+    check('missing example Chinese is fetched and saved with the original sentence',word(page,'localcontext')['sentence_zh']=='他们昨天讨论了这个目标。')
+    page.reload();page.wait_for_selector('#statDue')
+    seed(page,[dict(old('stress','强调'),article='2026-10-27',sentence='The authors stress that the situation is not hopeless.',sentence_zh='')])
+    page.evaluate("ER.translateSentenceText=()=>Promise.resolve(null)")
+    start(page);step(page);page.wait_for_function("document.querySelector('.context-zh').textContent.includes('语境参考')")
+    check('failed sentence translation falls back to labelled article context', '所在段落中文（语境参考）' in page.inner_text('.context-zh') and '并非' in page.inner_text('.context-zh'))
+    page.reload();page.wait_for_selector('#statDue')
+
+    # A full review can be completed without mouse clicks.
+    seed(page,[old('resilience','恢复力'),old('contribute','贡献')])
+    page.keyboard.press('Enter');page.wait_for_selector('#recallInput')
+    check('Enter starts review and focuses the answer box', page.locator('#recallInput').evaluate('(e)=>document.activeElement===e'))
+    page.keyboard.type('123')
+    check('number shortcuts do not intercept typing', page.input_value('#recallInput')=='123' and len(word(page,'resilience')['srs']['history'])==0)
+    page.fill('#recallInput','恢复能力')
+    page.locator('#recallInput').dispatch_event('keydown',{'key':'Enter','isComposing':True,'bubbles':True})
+    check('IME Enter does not reveal or submit a composition', not page.locator('#recallAnswer').is_visible())
+    page.keyboard.press('Enter')
+    check('Enter reveals the written answer', page.locator('#recallAnswer').is_visible())
+    page.keyboard.press('Enter')
+    check('Enter cannot silently award a self-rating', len(word(page,'resilience')['srs']['history'])==0)
+    page.keyboard.press('3');page.keyboard.press('Enter');page.wait_for_selector('#clozeInput')
+    check('3 grades meaning and Enter proceeds to context with Chinese visible', word(page,'resilience')['srs']['history'][-1]['rating']=='good' and page.locator('#clozeZh').is_visible())
+    page.fill('#clozeInput',item(page)['answer']);page.keyboard.press('Enter');page.keyboard.press('Enter')
+    check('keyboard-only mixed round reaches the summary', page.locator('#summaryCard').count()==1)
+    seed(page,[old('resilience')]);start(page)
+    page.keyboard.press('Alt+h');check('Alt+H requests and records a hint while typing', item(page).get('assisted'))
+    page.keyboard.press('Alt+n');page.keyboard.press('Enter')
+    check('Alt+N skips an unknown word with a failure record', word(page,'resilience')['srs']['history'][-1]['rating']=='again')
+    seed(page,[old('resilience')]);start(page)
+    page.evaluate("document.getElementById('settingsPanel').hidden=false;document.getElementById('optDsKey').focus()")
+    page.keyboard.press('Escape')
+    check('closing settings with Escape does not pause review', page.locator('#qCard').count()==1 and page.locator('#summaryCard').count()==0)
+    page.locator('#recallInput').focus();page.keyboard.press('Escape')
+    check('Escape pauses the active round', page.locator('#summaryCard').count()==1)
 
     # A word marked familiar remains in the vocabulary and will be spot-checked.
     seed(page, [], new=5)

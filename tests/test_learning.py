@@ -62,10 +62,12 @@ with sync_playwright() as p:
     fb='## 总评\n需要核对主语。\n## 逐句点评\n> '+sentence+'\n- **问题**：主语和报告内容漏译。\n- **怎么译**：先确认谁报告，再译内容。\n- **改为**：刚果民主共和国卫生官员报告称，该国当前疫情已成为有记录以来规模最大的一次。\n## 参考译文\n参考。\n## 小结\n先找主语。'
     page.route('https://api.deepseek.com/chat/completions',lambda r:r.fulfill(status=200,content_type='application/json',body=json.dumps({'choices':[{'message':{'content':fb},'finish_reason':'stop'}]})))
     page.evaluate("localStorage.setItem('er_ds_key','sk-test-only-learning')")
-    page.click('[data-tp="0"]');page.fill('#tpIn0','疫情正在增长。');page.click('[data-tpsend="0"]')
+    page.evaluate('([date,fb])=>ER.mergeTranslations({[date+"#0"]:{text:"疫情正在增长。",fb:fb,updatedAt:Date.now()}})',[article['date'],fb])
+    page.locator('.legacy-translation>summary').first.click()
+    page.click('[data-import-errors="0"]')
     page.wait_for_function('Object.values(ER.getLearningState()).some(x=>x.type==="drill")')
     ds=[x for x in saved(page).values() if x.get('type')=='drill']
-    check('new feedback automatically creates a next-day drill',len(ds)==1 and ds[0]['due']=='2026-11-03')
+    check('saved legacy feedback still imports a next-day drill',len(ds)==1 and ds[0]['due']=='2026-11-03')
     check('old feedback exposes an import and manual-edit path',page.locator('[data-import-errors="0"]').is_visible() and page.locator('[data-save-error="0"]').count()==1)
     page.click('[data-import-errors="0"]');check('importing same correction does not create duplicates',len([k for k in saved(page) if k.startswith('drill:')])==1)
     page.click('a[data-tab="review"]');check('new mistakes do not become due on the day of creation',page.locator('#btnStartDrills').count()==0)

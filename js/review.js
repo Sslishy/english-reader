@@ -162,14 +162,14 @@ function renderHome(msg){
     '<div class="review-settings"><label>学习重点 <select id="optReviewMode"><option value="reading"'+(!balanced()?' selected':'')+'>阅读：词义 + 语境</option><option value="balanced"'+(balanced()?' selected':'')+'>综合：加练拼写</option></select></label>'+
     '<label>每天新词 <select id="optNewPer">'+[0,5,10,15,20,30].map(function(n){return '<option value="'+n+'"'+(+ER.settings.newPerDay===n?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label>'+
     '<label class="opt"><input type="checkbox" id="optCet6"'+(ER.settings.cet6?' checked':'')+'> 包含六级</label></div>'+
-    '<details class="review-help"><summary>这一轮会怎样帮助记忆？</summary><p>先复习旧词，再学收藏词和四六级词。词义题先写一个核心意思，再对照答案自评；语境题隐藏目标词，输入空缺的英文。不同能力分天安排，每词每天只做一次正式测试。</p><p>完成全部单词后，可以选择补练错词一次；与上次出现之间至少隔开 8 个不同词。只有三四个词或间隔不足时直接结束，留到明天验证。新词初练、提示和当天补练不算独立掌握。综合模式加练拼写，各能力进度分别保存。</p></details>'+
+    '<details class="review-help"><summary>这一轮会怎样帮助记忆？</summary><p>先复习旧词，再学收藏词和四六级词。词义题先写一个核心意思，再对照答案自评；语境题提供中文意思和例句中文，输入空缺的英文。不同能力分天安排，每词每天只做一次正式测试。</p><p>完成全部单词后，可以选择补练错词一次；与上次出现之间至少隔开 8 个不同词。只有三四个词或间隔不足时直接结束，留到明天验证。新词初练、提示和当天补练不算独立掌握。综合模式加练拼写，各能力进度分别保存。</p></details>'+
     (oldKnown?'<div class="known-recover"><p>旧版有 '+oldKnown+' 个词曾标记「我认识」而不再出现。</p><button id="btnRestoreKnown">恢复这些词的低频抽查</button></div>':'')+'</div>';
-  h+=retentionHtml()+'<div class="card"><h3 class="card-title">未来 14 天复习量</h3>'+calendarHtml()+'</div>';
+  h+=keyboardHelp()+retentionHtml()+'<div class="card"><h3 class="card-title">未来 14 天复习量</h3>'+calendarHtml()+'</div>';
   box.innerHTML=h;
   $('btnStart').onclick=function(){ startSession(false); };
   if(resume) $('btnResume').onclick=function(){
     S=resume; box.innerHTML='<div class="card">正在恢复复习…</div>';
-    Promise.all([loadLists(),ensureExamples()]).then(next).catch(function(){renderHome('<p class="err">恢复失败，请重试。</p>');});
+    Promise.all([loadLists(),ensureExamples(),loadContextArticles()]).then(next).catch(function(){renderHome('<p class="err">恢复失败，请重试。</p>');});
   };
   $('optReviewMode').onchange=function(){ER.settings.reviewMode=this.value;ER.saveSettings();ER.updateBadge();renderHome();};
   $('optCet6').onchange=function(){ER.settings.cet6=this.checked;ER.saveSettings();};
@@ -200,7 +200,7 @@ function chooseSkill(v,index){
 }
 function startSession(){
   box.innerHTML='<div class="card"><p class="muted"><span class="spinner"></span>正在准备今天的单词…</p></div>';
-  Promise.all([loadLists(),ensureExamples()]).then(function(){
+  Promise.all([loadLists(),ensureExamples(),loadContextArticles()]).then(function(){
     var t=today(), c=counts(), q=[], news=pickNew(c.newLeft);
     var due=SRS.dueList(ER.getVocab(),t,0,balanced()).sort(function(a,b){
       var freshA=!(a.srs.reps||0), freshB=!(b.srs.reps||0);
@@ -228,7 +228,7 @@ function startSession(){
 function progressHtml(){
   var main=S.queue.slice(0,S.mainEnd).filter(function(q){return q.kind==='test';}),done=main.filter(function(q){return q.done;}).length;
   var retry=S.idx>=S.mainEnd,n=retry?S.queue.length-S.mainEnd:main.length,i=retry?S.idx-S.mainEnd:done;
-  return '<div class="rv-head"><span class="muted">'+(retry?'错词补练 · '+(i+1)+' / '+n+' 词 · 每词仅一次':'本轮 '+n+' 个不同词 · 已完成 '+done)+' · 无提示 '+S.correct+'</span><button id="btnQuit">暂停 / 结束本轮</button></div><div class="progress"><i style="width:'+Math.round(i/Math.max(1,n)*100)+'%"></i></div>';
+  return keyboardHelp()+'<div class="rv-head"><span class="muted">'+(retry?'错词补练 · '+(i+1)+' / '+n+' 词 · 每词仅一次':'本轮 '+n+' 个不同词 · 已完成 '+done)+' · 无提示 '+S.correct+'</span><button id="btnQuit">暂停 / 结束本轮</button></div><div class="progress"><i style="width:'+Math.round(i/Math.max(1,n)*100)+'%"></i></div>';
 }
 function bindQuit(){ $('btnQuit').onclick=function(){saveSession();summary(true);}; }
 function next(){
@@ -251,7 +251,7 @@ function correctionHtml(v,it){
   return '<div class="memory-card"><div class="answer">'+esc(v.word)+' <span class="ipa">'+esc(ER.fmtIpa(v.phonetic))+'</span></div>'+
     '<div class="memory-meaning">'+esc(v.zh||v.en||'暂无释义，可在生词本补充')+'</div>'+
     (chunk?'<div class="memory-chunk"><span>'+(v.collocation?'常用搭配':'原句记忆片段')+'</span> '+esc(chunk)+'</div>':'')+
-    (sent?'<div class="qex">'+esc(sent.en)+'</div>'+(sent.zh?'<div class="qexzh">'+esc(sent.zh)+'</div>':''):'')+
+    (sent?'<div class="qex">'+esc(sent.en)+'</div>'+sentenceChineseHtml(sent):'')+
     (v.note?'<div class="qexzh">笔记：'+esc(v.note)+'</div>':'')+(it&&it.diff?it.diff:'')+'</div>';
 }
 function renderCard(it){
@@ -264,7 +264,7 @@ function renderCard(it){
   S.exposures=S.exposures||{};S.exposures['word:'+v.word]=S.idx;saveSession();
   box.innerHTML='<div class="card">'+progressHtml()+'<div class="qcard"><span class="qtype newcard">'+(x?'补充新词':'阅读 / 手动收藏')+'</span>'+correctionHtml(v)+
     '<p class="hint">先抓住一个核心意思，读一遍原句。稍后会收起答案，让你自己回忆。</p><div class="row recall-actions"><button id="btnSay">🔊 听发音</button><button class="primary big" id="btnGotIt">开始记忆，稍后回忆 →</button><button id="btnKnown">已认识，改为 7 天后抽查</button></div></div></div>';
-  bindQuit();$('btnSay').onclick=function(){ER.speak(v.word,v.audio);};
+  bindQuit();fillSentenceChinese();$('btnSay').onclick=function(){ER.speak(v.word,v.audio);};
   $('btnGotIt').onclick=function(){it.done=true;if(S.learned.indexOf(v.word)<0)S.learned.push(v.word);saveSession();advance();};
   $('btnKnown').onclick=function(){
     v.srs=SRS.markKnown(v.srs,today());ER.saveVocab();markSeen(v.word,'learn');it.done=true;S.known.push(v.word);
@@ -280,8 +280,8 @@ function renderRecall(it,v){
     '<div id="recallHint" class="hint" hidden></div><div id="recallAnswer" hidden></div><div id="recallRating" class="recall-ratings" hidden>'+
     '<button id="btnRecallAgain">意思不对</button><button id="btnRecallHard">只写对一部分</button><button class="primary" id="btnRecallGood">意思准确</button></div>'+
     '<div class="feedback" id="feedback" aria-live="polite"></div><div class="row recall-actions"><button class="primary" id="btnNext" hidden>下一词 →</button></div></div></div>';
-  bindQuit();$('btnSay').onclick=function(){ER.speak(v.word,v.audio);};
-  var inp=$('recallInput');inp.value=it.response||'';
+  bindQuit();fillSentenceChinese();$('btnSay').onclick=function(){ER.speak(v.word,v.audio);};
+  var inp=$('recallInput');inp.value=it.response||'';if(!it.revealed)inp.focus({preventScroll:true});
   inp.oninput=function(){if(!it.revealed){it.response=inp.value;saveSession();}};
   function hint(){
     it.assisted=true;it.hintUsed=true;var sent=resolveSentence(v);$('recallHint').hidden=false;$('recallHint').textContent=sent?sent.en:'暂无可用原句，可以点「想不起来，重新学」。';
@@ -298,7 +298,7 @@ function renderRecall(it,v){
     it.revealed=true;inp.readOnly=true;
     box.querySelector('.recall-entry').hidden=true;box.querySelector('.recall-instruction').hidden=true;
     $('recallAnswer').innerHTML='<div class="recall-comparison"><b>揭晓前的答案</b><p>'+esc(it.response||'（没想起来）')+'</p></div>'+correctionHtml(v)+'<p class="hint">对照你的原答案核对核心意思。这是自评，不会自动判断中文同义表达。</p>';
-    $('recallAnswer').hidden=false;$('recallRating').hidden=!!skip;
+    $('recallAnswer').hidden=false;$('recallRating').hidden=!!skip;fillSentenceChinese();
     $('btnReveal').hidden=true;$('btnRecallSkip').hidden=true;$('btnRecallHint').disabled=true;saveSession();
     if(skip)grade(it,v,'again');
   }
@@ -346,16 +346,54 @@ function exampleLookup(w){
   return null;
 }
 /** Resolve {en, zh, src} for cloze; null if none. */
+var contextArticles=[],contextReady=null,translationPending=Object.create(null);
+function loadContextArticles(){
+  if(contextReady)return contextReady;
+  contextReady=(ER.getArticleIndex?ER.getArticleIndex():Promise.resolve([])).then(function(idx){
+    return Promise.all(idx.map(function(x){return ER.fetchJson('articles/'+x.file,15000).catch(function(){return null;});}));
+  }).then(function(a){contextArticles=a.filter(Boolean);},function(){contextArticles=[];});
+  return contextReady;
+}
 function resolveSentence(v){
-  if(!v) return null;
-  if(v.sentence && String(v.sentence).trim()){
-    return {en:String(v.sentence).trim(), zh:String(v.sentence_zh||'').trim(), src:'收藏语境'};
+  if(!v)return null;
+  var en=String(v.sentence||'').trim(),zh=String(v.sentence_zh||'').trim(),label='例句中文',fallback='';
+  if(en){
+    var articles=contextArticles.slice(),cur=ER.currentArticle&&ER.currentArticle();if(cur)articles.unshift(cur);
+    for(var i=0;i<articles.length;i++){
+      var a=articles[i];if(v.article&&v.article!==a.date)continue;
+      // Repair old decimal-splitting title fragments without altering the saved vocabulary.
+      if(!fallback&&Array.isArray(a.paragraphs_zh)){var pi=(a.paragraphs||[]).findIndex(function(p){return p.includes(en);});if(pi>=0)fallback=a.paragraphs_zh[pi]||'';}
+      if(a.title===en||(v.article&&en.length>15&&a.title&&a.title.endsWith(en))){return {en:a.title,zh:a.title_zh||zh,src:'文章标题',zhLabel:'标题中文'};}
+    }
+    var lesson=ER.findSentenceLesson&&ER.findSentenceLesson(en,v.article);
+    if(!zh&&lesson&&lesson.translation)zh=lesson.translation;
+    return {en:en,zh:zh,src:'收藏语境',zhLabel:label,fallbackZh:fallback};
   }
   var ce=cetEntry(v.word);
-  if(ce && ce.ex) return {en:ce.ex, zh:ce.exzh||'', src:'四六级例句'};
+  if(ce&&ce.ex)return {en:ce.ex,zh:ce.exzh||'',src:'四六级例句',zhLabel:label};
   var ex=exampleLookup(v.word);
-  if(ex && ex.en) return {en:ex.en, zh:ex.zh||'', src:'补充例句'};
-  return null;
+  return ex&&ex.en?{en:ex.en,zh:ex.zh||'',src:'补充例句',zhLabel:label}:null;
+}
+function sentenceChineseHtml(sent){
+  if(!sent)return '';
+  return '<div class="qexzh context-zh" lang="zh-CN"'+(!sent.zh?' data-context-en="'+esc(sent.en)+'" data-context-fallback="'+esc(sent.fallbackZh||'')+'"':'')+'><b>'+esc(sent.zhLabel||'例句中文')+'：</b><span>'+(sent.zh?esc(sent.zh):'正在补充中文…')+'</span></div>';
+}
+function fillSentenceChinese(){
+  box.querySelectorAll('[data-context-en]').forEach(function(host){
+    if(host.dataset.loading)return;host.dataset.loading='true';
+    var en=host.dataset.contextEn;
+    if(!translationPending[en])translationPending[en]=(ER.translateSentenceText?ER.translateSentenceText(en):Promise.resolve(null)).catch(function(){return null;});
+    translationPending[en].then(function(r){
+      if(!host.isConnected)return;
+      if(r&&r.zh){
+        host.querySelector('b').textContent='例句中文：';host.querySelector('span').textContent=r.zh;host.title=r.src||'例句中文';
+        var changed=false;ER.getVocab().forEach(function(v){if(v.sentence===en&&!v.sentence_zh){v.sentence_zh=r.zh;changed=true;}});if(changed)ER.saveVocab();
+      }else{
+        if(host.dataset.contextFallback){host.querySelector('b').textContent='所在段落中文（语境参考）：';host.querySelector('span').textContent=host.dataset.contextFallback;}else host.querySelector('span').textContent='中文暂未加载成功，目标词义仍可用于作答。';
+        var btn=document.createElement('button');btn.textContent='重试中文';btn.onclick=function(){translationPending[en]=ER.translateSentenceText(en,true).catch(function(){return null;});delete host.dataset.loading;host.querySelector('span').textContent='正在补充中文…';btn.remove();fillSentenceChinese();};host.appendChild(btn);
+      }
+    });
+  });
 }
 function simpleForms(word){
   var w=String(word||''), out=[w], low=w.toLowerCase();
@@ -380,7 +418,7 @@ function clozeBlank(v, sentEn){
   var cands=[];
   if(isPhrase(v)){
     cands.push(v.word);
-    tokens(v.word).forEach(function(t){ if(/[A-Za-z]/.test(t) && t.length>2) cands.push(t); });
+    (v.forms||[]).forEach(function(f){if(/\s/.test(f))cands.push(f);});
   } else {
     cands=cands.concat(simpleForms(v.word));
     (v.forms||[]).forEach(function(f){ cands=cands.concat(simpleForms(f)); });
@@ -519,9 +557,9 @@ function renderTest(it){
   } else if(type==='cloze'){
     var sent=resolveSentence(v), blank=clozeBlank(v, sent.en);
     it.answer=blank.accept; it.baseWord=v.word; it.sentZh=sent.zh; it.sentSrc=sent.src;
-    h+='<div class="hint">根据句子写出空缺的英文'+(ph?'短语':'单词')+'（填句子里出现的形式） · '+esc(sent.src)+'</div>'+
+    h+='<div class="hint">根据中文意思填入英文'+(ph?'短语':'单词')+'（填句子里出现的形式） · '+esc(sent.src)+'</div>'+
        '<div class="cloze-sent" id="clozeSent">'+blank.html+'</div>'+
-       '<button id="btnClozeHint">提示中文</button><div class="qexzh" id="clozeZh" hidden>'+esc(sent.zh||zh)+'</div>'+ 
+       '<div class="cloze-cue" id="clozeZh"><b>要表达的意思：</b>'+esc(zh)+'</div>'+sentenceChineseHtml(sent)+'<button id="btnClozeHint">提示英文首字母</button>'+  
        '<div class="spell cloze"><input type="text" id="clozeInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="填入空缺内容"><button class="primary" id="btnCheck">确认</button></div>';
   } else if(type==='gaps'){
     var mask=gapMask(v.word, v.srs.stage, today());
@@ -551,7 +589,7 @@ function renderTest(it){
     it.answer=v.word;
   }
   h+='<div class="row recall-actions"><button id="btnDontKnow">没想起来，看答案</button></div><div class="feedback" id="feedback" aria-live="polite"></div><div class="row" style="justify-content:center"><button class="primary" id="btnNext" hidden>下一题 →</button></div></div></div>';
-  box.innerHTML=h; bindQuit();
+  box.innerHTML=h; bindQuit();fillSentenceChinese();
   $('btnDontKnow').onclick=function(){if(it.done)return;Array.prototype.forEach.call(box.querySelectorAll('#qCard input,#qCard button'),function(el){el.disabled=true;});grade(it,v,false);};
   var say=$('btnSay'); if(say) say.onclick=function(){ ER.speak(v.word, v.audio); };
   if(type==='spell'){
@@ -586,8 +624,8 @@ function renderTest(it){
       grade(it, v, ok);
     };
   } else if(type==='cloze'){
-    $('btnClozeHint').onclick=function(){it.assisted=true;$('clozeZh').hidden=false;this.disabled=true;saveSession();};
-    if(it.assisted){$('clozeZh').hidden=false;$('btnClozeHint').disabled=true;}
+    $('btnClozeHint').onclick=function(){it.assisted=true;$('clozeInput').placeholder=it.answer.split(/\s+/).map(function(w){return w[0]+'…';}).join(' ');this.disabled=true;saveSession();};
+    if(it.assisted){$('clozeInput').placeholder=it.answer.split(/\s+/).map(function(w){return w[0]+'…';}).join(' ');$('btnClozeHint').disabled=true;}
     var cin=$('clozeInput'); setTimeout(function(){ try{cin.focus();}catch(e){} },50);
     var checkC=function(){
       if(it.done||cin.readOnly) return;
@@ -701,7 +739,7 @@ function grade(it,v,result){
   target.attempts++;
   // A correction never replaces the first answer; tomorrow's cold success clears pending.
   if(it.first)target.done=independent;
-  v.srs=SRS.record(v.srs,{skill:it.skill,rating:rating,date:today(),assisted:!!it.assisted,practice:!it.first,self:it.type==='recall',response:it.response,task:it.type});
+  v.srs=SRS.record(v.srs,{skill:it.skill,rating:rating,date:today(),assisted:!!it.assisted,practice:!it.first,self:it.type==='recall',response:it.response,task:it.type==='cloze'?'cloze_zh':it.type});
   v.srs.skills[it.skill].learningPending=!target.done;
   var tomorrow=SRS.addDays(today(),1),track=v.srs.skills[it.skill];
   if(!target.done&&track.due>tomorrow)track.due=tomorrow;
@@ -723,6 +761,7 @@ function grade(it,v,result){
   var title=independent?(it.type==='recall'?'✓ 已记录：写出意思并核对准确（自评）':'✓ 无提示答对'):rating==='good'?(!it.first?'✓ 本次补练答对 · 明天仍需验证':it.isNew?'✓ 完成新词初练 · 明天再验证':'提示后答对 · 不计独立通过'):rating==='hard'?'只记住了一部分 · 明天再验证':'先看清意思和用法，明天再试';
   fb.innerHTML='<b>'+title+'</b>'+(it.type==='recall'?'':correctionHtml(v,it))+
     '<p class="hint">'+(target.done?SKILL_NAME[it.skill]+'下次验证：'+esc(track.due):!it.first?'本词今日练习结束，不再循环。':it.isNew?'今天先到这里，明天隐藏答案再测。':'先继续其他词；本轮结束后，间隔足够的错词可选补练一次。')+'</p>';
+  fillSentenceChinese();
   var dont=$('btnDontKnow');if(dont)dont.hidden=true;
   var nb=$('btnNext');nb.disabled=false;nb.hidden=false;nb.onclick=advance;
 }
@@ -741,5 +780,33 @@ function summary(early){
   if(early)$('btnContinue').onclick=function(){S=state;next();};
   if($('btnAgain'))$('btnAgain').onclick=function(){startSession();};
 }
+function keyboardHelp(){
+  return '<details class="review-keys"><summary>键盘操作：Enter 提交 / 下一词 · 1 / 2 / 3 核对</summary><p><kbd>1</kbd> 意思不对　<kbd>2</kbd> 部分正确　<kbd>3</kbd> 意思准确<br><kbd>Alt + H</kbd> 额外提示　<kbd>Alt + P</kbd> 发音　<kbd>Alt + N</kbd> 想不起来<br><kbd>Esc</kbd> 暂停　<kbd>Shift + Enter</kbd> 在输入框内换行。中文输入法选字时不会触发提交。</p></details>';
+}
+function keyClick(id){
+  var b=$(id);if(!b||b.disabled||b.hidden||!b.getClientRects().length)return false;
+  b.click();return true;
+}
+document.addEventListener('keydown',function(e){
+  if(e.defaultPrevented||e.isComposing||e.keyCode===229||e.repeat||ER.currentTab!=='review'||!box.getClientRects().length)return;
+  if(($('settingsPanel')&&!$('settingsPanel').hidden)||document.querySelector('#pop.show'))return;
+  var t=e.target,editing=t&&(t.isContentEditable||(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)&&!t.readOnly&&!t.disabled));
+  // Other review modules, settings, and normal text entry retain their own keys.
+  if(t&&t.closest&&t.closest('#translationReviewBox'))return;
+  if(e.ctrlKey||e.metaKey||e.shiftKey)return;
+  var id=null,k=e.key.toLowerCase();
+  if(e.altKey){
+    if(k==='h')id=$('btnRecallHint')?'btnRecallHint':$('btnClozeHint')?'btnClozeHint':'btnHint';
+    if(k==='p')id='btnSay';
+    if(k==='n')id=$('btnRecallSkip')?'btnRecallSkip':'btnDontKnow';
+  }else if(e.key==='Escape'&&S)id='btnQuit';
+  else if(e.key==='Enter'){
+    var ids=['btnNext','btnGotIt','btnReveal','btnCheck','btnSkipContext','btnStartRetry','btnContinue','btnHome','btnResume','btnStart'];
+    id=ids.find(function(x){var b=$(x);return b&&!b.hidden&&!b.disabled&&b.getClientRects().length;});
+    // A revealed answer must be explicitly graded, never auto-awarded with Enter.
+    if(!id&&$('recallRating')&&!$('recallRating').hidden){e.preventDefault();e.stopPropagation();return;}
+  }else if(!editing&&/^[123]$/.test(e.key))id={1:'btnRecallAgain',2:'btnRecallHard',3:'btnRecallGood'}[e.key];
+  if(id){var b=$(id);if(b&&!b.disabled&&!b.hidden&&b.getClientRects().length){e.preventDefault();e.stopPropagation();keyClick(id);}}
+},true);
 ER.views.review={show:function(){if(S)next();else renderHome();},refresh:function(){if(!S&&ER.currentTab==='review')renderHome();},state:function(){return S;}};
 })();
