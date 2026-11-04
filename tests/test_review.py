@@ -140,7 +140,7 @@ with sync_playwright() as p:
     def profile(mobile=False):
         ctx = browser.new_context(viewport={'width':390 if mobile else 1100, 'height':820},
                                   has_touch=mobile, is_mobile=mobile, accept_downloads=True)
-        ctx.add_init_script('''if(window.speechSynthesis){speechSynthesis.speak=()=>{};speechSynthesis.cancel=()=>{};}''')
+        ctx.add_init_script('''window.__spoken=[];window.__speechStops=0;window.SpeechSynthesisUtterance=function(text){this.text=text;};if(window.speechSynthesis){speechSynthesis.speak=u=>__spoken.push(u.text);speechSynthesis.cancel=()=>__speechStops++;speechSynthesis.getVoices=()=>[{lang:'en-US'}];}''')
         ctx.route('https://**/*', lambda route: route.fulfill(status=204, body=''))
         pg = ctx.new_page()
         pg.on('pageerror', lambda e: errors.append(str(e)))
@@ -156,6 +156,7 @@ with sync_playwright() as p:
     check('legacy meaning progress migrates without erasure', migrated['skills']['meaning']['stage'] == 2 and migrated['skills']['meaning']['due'] == DAY)
     start(page)
     check('reading review begins with independent recall', item(page)['type'] == 'recall')
+    check('word meaning prompt automatically pronounces the word once',page.evaluate('__spoken')==['resilience'])
     check('translation and scoring hidden before reveal', '韧性；恢复力' not in page.inner_text('#qCard') and not page.locator('#btnRecallGood').is_visible())
     page.click('#btnReveal')
     check('empty response cannot reveal answers or self-grade', not page.locator('#recallAnswer').is_visible() and not page.locator('#btnRecallGood').is_visible())
@@ -166,6 +167,7 @@ with sync_playwright() as p:
     page.click('#btnReveal')
     check('reveal shows meaning and three recall ratings', '韧性；恢复力' in page.inner_text('#qCard') and all(page.locator(x).is_visible() for x in ['#btnRecallGood','#btnRecallHard','#btnRecallAgain']))
     page.click('#btnRecallGood')
+    check('revealing and grading meaning does not restart the pronunciation',page.evaluate('__spoken')==['resilience'])
     good = word(page, 'resilience')['srs']
     check('independent recall advances only meaning', good['skills']['meaning']['stage'] == 3 and good['skills']['spelling']['stage'] == 0)
     check('history preserves the pre-reveal answer and self-rating', good['history'][-1]['self'] and not good['history'][-1]['assisted'] and good['history'][-1]['response']=='恢复能力' and page.locator('#recallInput').get_attribute('readonly') is not None)
@@ -185,6 +187,7 @@ with sync_playwright() as p:
       v.srs=SRS.normalize(v.srs,ER.today());ER.saveVocab();}''')
     page.reload(); page.wait_for_selector('#btnStart'); start(page)
     check('overdue spelling gets its own prompt', item(page)['skill'] == 'spelling' and item(page)['type'] == 'spell')
+    check('spelling prompt still plays automatically',page.evaluate('__spoken')==['resilience'])
     step(page, 'again')
     spelling = word(page, 'resilience')['srs']
     check('spelling error does not erase meaning progress', spelling['skills']['meaning']['stage'] == 2 and spelling['skills']['meaning']['due'] == '2026-11-15' and spelling['skills']['spelling']['lapses'] > 0)
@@ -198,7 +201,11 @@ with sync_playwright() as p:
     repeated=page.evaluate("ER.clozeBlank({word:'contribute'},'They contribute today and contributed yesterday.').html")
     check('context hides repeated target forms instead of leaking the answer', 'contribute' not in repeated.lower() and repeated.count('id=\"clozeBlank\"')==1 and '〔同词〕' in repeated)
     check('usage prompt blanks inflected form', item(page)['type'] == 'cloze' and item(page)['answer'].lower() == 'contributed')
+    check('cloze waits for submission before speaking its hidden answer',page.evaluate('__spoken')==[])
     step(page)
+    check('cloze feedback automatically reads the answer in its sentence form',page.evaluate('__spoken')==['contributed'])
+    page.keyboard.press('Alt+p')
+    check('Alt+P replays the cloze answer after submission',page.evaluate('__spoken')==['contributed','contributed'])
     check('Chinese-supported production records usage without treating the normal cue as a penalty', word(page, 'contribute')['srs']['history'][-1]['skill'] == 'usage' and word(page, 'contribute')['srs']['history'][-1]['task']=='cloze_zh' and not word(page, 'contribute')['srs']['history'][-1]['assisted'])
 
     # Different abilities are spread over days, not three prompts for one word.
@@ -297,12 +304,24 @@ with sync_playwright() as p:
     check('closing settings with Escape does not pause review', page.locator('#qCard').count()==1 and page.locator('#summaryCard').count()==0)
     page.locator('#recallInput').focus();page.keyboard.press('Escape')
     check('Escape pauses the active round', page.locator('#summaryCard').count()==1)
+    check('pause stops active pronunciation',page.evaluate('__speechStops')>0)
+    audio_race=page.evaluate('''async()=>{
+      const play=HTMLMediaElement.prototype.play;window.__spoken=[];
+      let rejectOld;HTMLMediaElement.prototype.play=()=>new Promise((_,reject)=>{rejectOld=reject;});
+      ER.speak('old word','https://example.test/old.mp3');ER.speak('current word');rejectOld(new Error('late failure'));
+      await Promise.resolve();const latest=__spoken.slice();
+      ER.speak('stopped word','https://example.test/stopped.mp3');ER.stopWordAudio();rejectOld(new Error('stopped'));
+      await Promise.resolve();HTMLMediaElement.prototype.play=play;
+      return {latest,afterStop:__spoken.slice()};
+    }''')
+    check('late audio failures cannot replay a previous or paused word',audio_race=={'latest':['current word'],'afterStop':['current word']})
 
     # A word marked familiar remains in the vocabulary and will be spot-checked.
     seed(page, [], new=5)
     start(page)
     page.wait_for_selector('#btnKnown')
     known_name = item(page)['word']
+    check('new-word learning card automatically reads its word',page.evaluate('__spoken')==[known_name])
     page.click('#btnKnown')
     known = word(page, known_name)
     check('known shortcut keeps word for future spot-check', known is not None and known['srs']['due'] == '2026-11-09')

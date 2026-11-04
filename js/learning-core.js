@@ -25,6 +25,29 @@ function compare(user,expected){
   return {exact:m===n&&L[0][0]===n,score:Math.round(100*L[0][0]/Math.max(m,n,1)),parts:parts};
 }
 function clean(s){return String(s||'').replace(/\*\*|`/g,'').trim();}
+/* Read both new and cached Markdown lessons; only collect phrases grounded in the sentence. */
+function sentencePhrases(lesson,source){
+  var lines=String(lesson||'').split('\n'),inside=false,level=0,blocks=[],current=null;
+  lines.forEach(function(line){
+    var heading=line.match(/^\s*(#{1,6})\s+(.+)$/);
+    if(heading&&/实用短语/.test(clean(heading[2]))){inside=true;level=heading[1].length;return;}
+    if(inside&&heading&&heading[1].length<=level){inside=false;current=null;}
+    if(!inside)return;
+    var plain=clean(line).replace(/^#{1,6}\s+/,'').replace(/^(?:[-*•]\s+|\d+[.)、]\s*)/,'').replace(/^(?:原文短语|短语)\s*[:：]\s*/,'').replace(/^["“]([^"”]+)["”]/,'$1');
+    var m=plain.match(/^([A-Za-z0-9][A-Za-z0-9’'\-\s]*?)(?=[:：—–→（(]|\s+-\s|$)(.*)$/);
+    if(m&&words(m[1]).length>=2){current={word:m[1].trim(),rest:[m[2]],block:[line]};blocks.push(current);}
+    else if(current){current.rest.push(line);current.block.push(line);}
+  });
+  var seen=Object.create(null),hay=' '+normal(source)+' ';
+  return blocks.reduce(function(out,b){
+    var key=normal(b.word);if(seen[key]||!hay.includes(' '+key+' ')||words(b.word).length>12)return out;
+    var meaning=b.rest.map(function(l){return clean(l).replace(/^\s*[-*•]\s*/,'').replace(/^[:：—–→\-\s]+/,'').replace(/^(?:此处意思|中文意思|中文|意思|含义|释义)\s*[:：]\s*/,'');}).find(function(l){return /[\u4e00-\u9fff]/.test(l)&&! /^(?:使用场景|用法|新例句|例句|使用示例)\s*[:：]/.test(l);});
+    if(!meaning)return out;
+    meaning=meaning.split(/[；;](?=\s*(?:用于|用来|常用|适用|使用|表示|描述))/)[0].trim();
+    if(!meaning||meaning.length>300||/[<>]/.test(meaning))return out;
+    seen[key]=true;out.push({word:b.word,zh:meaning,block:b.block.join('\n').trim()});return out;
+  },[]).slice(0,8);
+}
 function category(issue){
   if(/指代|代词|主语/.test(issue))return '指代与主语';
   if(/否定|not|否认/.test(issue))return '否定关系';
@@ -67,5 +90,5 @@ function validQuestions(a){
     return q&&typeof q.id==='string'&&/^[A-Za-z0-9_-]+$/.test(q.id)&&typeof q.prompt==='string'&&Array.isArray(q.options)&&q.options.length>=2&&q.options.length<=6&&q.options.every(function(x){return typeof x==='string';})&&Number.isInteger(q.answer)&&q.answer>=0&&q.answer<q.options.length&&Array.isArray(q.evidence)&&q.evidence.length>0&&q.evidence.every(function(e){return e&&Number.isInteger(e.paragraph)&&typeof e.quote==='string'&&e.quote.length>0&&typeof a.paragraphs[e.paragraph]==='string'&&a.paragraphs[e.paragraph].includes(e.quote);});
   });
 }
-root.LearningCore={words:words,normal:normal,hash:hash,sentences:sentences,compare:compare,extract:extract,category:category,analyze:analyze,validQuestions:validQuestions};
+root.LearningCore={words:words,normal:normal,hash:hash,sentences:sentences,compare:compare,extract:extract,sentencePhrases:sentencePhrases,category:category,analyze:analyze,validQuestions:validQuestions};
 })(typeof window!=='undefined'?window:globalThis);

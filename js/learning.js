@@ -88,7 +88,7 @@ function renderListen(){
 }
 function moveListen(i){if(!listen||i<0||i>=listen.sentences.length)return;stopAudio();listen.index=i;listen.revealed=false;listen.assisted=false;listen.draft='';listen.feedback='';listen.open=true;renderListen();}
 function playSentence(){
-  if(!listen)return;stopAudio();
+  if(!listen)return;if(ER.stopWordAudio)ER.stopWordAudio();stopAudio();
   if(!window.speechSynthesis||!window.SpeechSynthesisUtterance){$('listenStatus').textContent='当前浏览器不支持语音合成，请使用支持英语语音的浏览器。';return;}
   var token=audioToken,remaining=listen.repeat,x=listen.sentences[listen.index],rate=listen.rate,accent=ER.settings.accent||'en-US';listen.playing=true;
   $('btnListenPlay').textContent='正在播放…';

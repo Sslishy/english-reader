@@ -400,6 +400,8 @@ kbd{font:12px/1.5 system-ui,sans-serif;border:1px solid #cad3df;border-bottom-wi
 .coach-panel .tp-md h4{font-size:16px;color:#254e7a;border-bottom:1px solid #dfe8f1;padding-bottom:5px;margin:18px 0 8px}
 .coach-panel .tp-md p{margin:8px 0}
 .coach-panel .tp-md code{white-space:normal;overflow-wrap:anywhere}
+.coach-save-phrase{display:inline-block;vertical-align:middle;margin:5px 0 5px 10px;min-height:36px;padding:5px 10px;font:13px/1.6 system-ui,sans-serif;color:#315f38;border-color:#b4ceb8;background:#f1f8ed;white-space:normal}
+.coach-save-phrase:disabled{opacity:1;color:#66766a;background:#f2f4f1;border-color:#d5dfd5;cursor:default}
 .legacy-translation{font:14px/1.8 system-ui,sans-serif;margin:10px 0 20px;padding:12px;background:#f6f6f6;border-radius:9px}
 .legacy-translation summary{cursor:pointer;color:var(--muted)}
 .legacy-draft{white-space:pre-wrap;margin:12px 0;padding:10px;background:white;border-radius:8px}

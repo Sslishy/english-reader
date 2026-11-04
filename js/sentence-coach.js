@@ -10,7 +10,7 @@ var SYSTEM=[
 '## 参考译文\n给出这一句完整自然的中文译文，不能把整段中文当作本句译文；数字、单位、否定和比较关系准确保留。',
 '## 句子主干\n指出主语、谓语、宾语或表语，用英文原片段对应中文；补充主要修饰成分修饰谁。没有的成分不要硬套。',
 '## 翻译顺序\n用编号列出具体顺序，每步格式为「英文原片段 → 中文表达；为什么先译或后译这一部分」。最后说明如何合并，避免只泛泛说“先主干后修饰”。可顺译就直说，不要强行倒装。',
-'## 实用短语\n选择这句里真正出现且可复用的 1–3 个搭配：原文短语、此处意思、使用场景。可给一个简短英汉例句，并明确标为“新例句”。没有值得记忆的短语就说明，不要凑数或编造原文。',
+'## 实用短语\n选择这句里真正出现且可复用的 1–3 个搭配，每项另起一行，严格写为「- **原文英文短语**：此处中文意思；用于……」。英文必须保留原句中的完整连续词组和词形，不要改成原形或带省略号的模板。可在下一行给一个简短英汉例句，并明确标为“新例句”。没有值得记忆的短语就说明，不要凑数或编造原文。',
 '## 迁移提示\n指出一个下次遇到类似句子可用的方法，以及本句最容易理解错的一点。',
 '不要输出 HTML，不要要求学生先提供自己的译文，不要重复整段原文。'
 ].join('\n');
@@ -27,6 +27,31 @@ ER.sentenceCoachHtml=function(a,s,html){
 };
 function panel(s){return $('coach'+s.index);}
 function button(s){return document.querySelector('[data-coach="'+s.index+'"]');}
+function phraseButtons(host,r,s){
+  if(!r||r.truncated)return;
+  var phrases=C.sentencePhrases(r.lesson,s.text),content=host.querySelector('.coach-content'),inside=false,nodes=[];
+  if(!content)return;
+  function textOf(el){return C.normal(el.textContent.replace(/^\s*\d+[.)、]\s*/,''));}
+  Array.from(content.children).forEach(function(el){
+    if(el.tagName==='H4'){
+      if(/实用短语/.test(el.textContent)){inside=true;return;}
+      if(!phrases.some(function(p){return textOf(el)===C.normal(p.word);}))inside=false;
+    }
+    if(inside){if(el.matches('p,h4'))nodes.push(el);nodes=nodes.concat(Array.from(el.querySelectorAll('li')));}
+  });
+  phrases.forEach(function(p,i){
+    var node=nodes.find(function(el){return (' '+textOf(el)+' ').startsWith(' '+C.normal(p.word)+' ');});
+    if(!node){
+      var containing=nodes.find(function(el){return (' '+textOf(el)+' ').includes(' '+C.normal(p.word)+' ');});
+      if(containing){node=document.createElement('div');node.className='coach-phrase-action';node.textContent=p.word+' · '+p.zh+' ';containing.after(node);}
+    }
+    if(!node)return;
+    var saved=!!ER.findWord(p.word),btn=document.createElement('button');
+    btn.type='button';btn.className='coach-save-phrase';btn.dataset.coachPhrase=s.index;btn.dataset.phraseIndex=i;
+    btn.disabled=saved;btn.textContent=saved?'✓ 已加入生词本':'＋ 加入生词本';btn.setAttribute('aria-label',(saved?'已收藏短语：':'加入生词本：')+p.word);
+    node.appendChild(btn);
+  });
+}
 function paint(a,s){
   var host=panel(s),key=id(a,s);if(!host||host.dataset.lessonId!==key)return;
   var r=cached(a,s),job=busy[key],msg=messages[key],b=button(s);
@@ -40,6 +65,7 @@ function paint(a,s){
     '<div class="row">'+(job?'<button data-coach-stop="'+s.index+'">停止生成</button>':r?'<button data-coach-retry="'+s.index+'">重新生成</button>':'')+
     (!job&&r&&r.translation&&!r.truncated?'<button data-coach-practice="'+s.index+'">加入明天复译</button>':'')+'</div>'+
     '<p class="hint">AI 讲解 · <kbd>Alt + ↑ / ↓</kbd> 切换句子 · <kbd>Alt + T</kbd> 展开 / 收起</p>';
+  if(!job)phraseButtons(host,r,s);
 }
 function request(a,s){
   var key=id(a,s);if(busy[key])return;
@@ -65,18 +91,24 @@ ER.refreshSentenceLessons=function(){var a=ER.currentArticle();if(a&&ER.currentT
 $('articleBox').addEventListener('click',function(e){
   var b=e.target.closest('button');if(!b)return;
   if(b.dataset.coachSettings!=null){$('settingsPanel').hidden=false;$('optDsKey').focus();return;}
-  var key=['coach','coachClose','coachRetry','coachStop','coachPractice'].find(function(k){return b.dataset[k]!=null;});if(!key)return;
+  var key=['coach','coachClose','coachRetry','coachStop','coachPractice','coachPhrase'].find(function(k){return b.dataset[k]!=null;});if(!key)return;
   var a=ER.currentArticle(),s=sentences()[+b.dataset[key]];if(!a||!s)return;
   e.preventDefault();activeIndex=s.index;
   if(key==='coach')toggle(s.index);
   else if(key==='coachClose'){open[id(a,s)]=false;stop(a,s);button(s).focus({preventScroll:true});}
   else if(key==='coachStop')stop(a,s);
   else if(key==='coachRetry')request(a,s);
+  else if(key==='coachPhrase'){
+    var savedLesson=cached(a,s),phrase=savedLesson&&!savedLesson.truncated&&C.sentencePhrases(savedLesson.lesson,s.text)[+b.dataset.phraseIndex];
+    if(!phrase||busy[id(a,s)])return;
+    if(!ER.findWord(phrase.word))ER.addWord({word:phrase.word,type:'phrase',zh:phrase.zh,sentence:s.text,sentence_zh:savedLesson.translation||'',source:'reading',article:a.date,note:'来自逐句 AI 翻译讲解'});
+    ER.toast('「'+phrase.word+'」已加入生词本');ER.refreshSentenceLessons();
+  }
   else{var r=cached(a,s);if(r&&r.translation){ER.addSentencePractice(a,s,r.translation);ER.toast('已加入明天复译。');paint(a,s);}}
 });
 function stopAll(){Object.keys(busy).forEach(function(k){busy[k].cancelled=true;busy[k].ctl.abort();delete busy[k];messages[k]='已停止生成，可重试。';});}
 window.addEventListener('hashchange',stopAll);window.addEventListener('pagehide',stopAll);
-window.addEventListener('storage',function(e){if(e.key==='er_learning'||e.key===null)ER.refreshSentenceLessons();});
+window.addEventListener('storage',function(e){if(e.key==='er_learning'||e.key==='er_vocab'||e.key===null)ER.refreshSentenceLessons();});
 document.addEventListener('keydown',function(e){
   if(e.defaultPrevented||e.isComposing||e.keyCode===229||e.repeat||!e.altKey||e.ctrlKey||e.metaKey||ER.currentTab!=='read'||!$('settingsPanel').hidden||document.querySelector('#pop.show'))return;
   if(e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName))return;

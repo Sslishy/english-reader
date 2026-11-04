@@ -33,7 +33,7 @@ LESSON='''## 参考译文
 <img src=x onerror="window.__coachXss=1">
 '''
 class Fake:
-    def __init__(self):self.calls=[];self.mode='ok';self.hung=[]
+    def __init__(self):self.calls=[];self.mode='ok';self.hung=[];self.lesson=LESSON
     def handle(self,r):
         if r.request.method=='OPTIONS':r.fulfill(status=204,headers={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'*'});return
         if r.request.url.endswith('/user/balance'):
@@ -43,8 +43,8 @@ class Fake:
         if self.mode=='offline':r.abort('internetdisconnected');return
         if self.mode.isdigit():r.fulfill(status=int(self.mode),body='{}');return
         reason='length' if self.mode=='truncated' else 'stop'
-        if self.mode=='json':r.fulfill(status=200,content_type='application/json',body=json.dumps({'choices':[{'message':{'content':LESSON},'finish_reason':reason}]}));return
-        chunks=[LESSON[i:i+17] for i in range(0,len(LESSON),17)]
+        if self.mode=='json':r.fulfill(status=200,content_type='application/json',body=json.dumps({'choices':[{'message':{'content':self.lesson},'finish_reason':reason}]}));return
+        chunks=[self.lesson[i:i+17] for i in range(0,len(self.lesson),17)]
         body=''.join('data: '+json.dumps({'choices':[{'delta':{'content':x}}]},ensure_ascii=False)+'\n\n' for x in chunks)
         body+='data: '+json.dumps({'choices':[{'delta':{},'finish_reason':reason}]})+'\n\ndata: [DONE]\n\n'
         r.fulfill(status=200,content_type='text/event-stream; charset=utf-8',body=body)
@@ -81,6 +81,23 @@ with sync_playwright() as p:
     check('reopening cached explanation makes no paid request',len(fake.calls)==calls)
     pg.reload();pg.wait_for_selector('.coach-btn.has');pg.click('[data-coach="0"]');wait_done(pg)
     check('cached teaching survives reload',len(fake.calls)==calls and pg.locator('#coach0 h4').count()==5)
+    collect=pg.locator('#coach0 .coach-save-phrase')
+    check('cached useful phrase gets a collection button without another AI call',collect.count()==1 and '加入生词本' in collect.inner_text() and len(fake.calls)==calls)
+    collect.click();saved_phrase=pg.evaluate("ER.findWord('climate change')")
+    check('phrase collection saves meaning, source sentence and its translation',saved_phrase['type']=='phrase' and saved_phrase['zh']=='气候变化' and saved_phrase['sentence']==first and saved_phrase['sentence_zh']==lesson['translation'] and saved_phrase['article']=='2026-10-27')
+    check('saved phrases show a disabled collected state',collect.is_disabled() and '已加入' in collect.inner_text())
+    pg.click('[data-coach="0"]');pg.click('[data-coach="0"]');wait_done(pg)
+    check('reopening cannot create duplicate vocabulary or reset progress',pg.evaluate("ER.getVocab().filter(v=>v.word==='climate change').length")==1 and pg.evaluate("ER.findWord('climate change').srs")==saved_phrase['srs'])
+    pg.goto(BASE.replace('#/read/2026-10-27','#/review'));pg.wait_for_selector('#btnStart');pg.click('#btnStart');pg.wait_for_selector('#btnGotIt')
+    check('collected phrase is scheduled for review with its original context','climate change' in pg.inner_text('#reviewBox') and first in pg.inner_text('#reviewBox'))
+    pg.goto(BASE);pg.wait_for_selector('.coach-btn')
+    if pg.locator('[data-coach="0"]').get_attribute('aria-expanded')!='true':pg.click('[data-coach="0"]')
+    wait_done(pg)
+    original_lessons=records(pg);cache_key=next(k for k,v in original_lessons.items() if v.get('original')==first)
+    variants=LESSON.replace('- **climate change**：气候变化；用于讨论环境问题。','### 1. **rising seas**\n- 此处意思：海平面上升\n\n### 2. **failed harvests**\n- 此处意思：歉收')
+    pg.evaluate('([k,r,text])=>{ER.saveLearningRecord(k,{...r,lesson:text});ER.refreshSentenceLessons();}',[cache_key,original_lessons[cache_key],variants])
+    check('older numbered phrase subheadings each receive their own button',pg.locator('#coach0 .coach-save-phrase').count()==2)
+    pg.evaluate('([k,r])=>{ER.saveLearningRecord(k,r);ER.refreshSentenceLessons();}',[cache_key,original_lessons[cache_key]])
     pg.click('[data-coach-practice="0"]')
     ds=[x for x in records(pg).values() if x.get('type')=='drill']
     check('learned sentence can become a next-day translation practice',len(ds)==1 and ds[0]['due']=='2026-11-04' and ds[0]['original']==first)
@@ -109,6 +126,7 @@ with sync_playwright() as p:
     check('old paragraph drafts and feedback remain readable','旧的译文' in pg.inner_text('#legacyTranslation0') and '以前的批改' in pg.inner_text('#legacyTranslation0'))
     backup=pg.evaluate('ER.buildBackup()');before=records(pg)
     check('backup and sync include lessons but exclude the API key',any(x.get('type')=='lesson' for x in backup['data']['learning'].values()) and KEY not in json.dumps(backup) and KEY not in pg.evaluate('JSON.stringify(ER.syncState())'))
+    check('backup carries the collected AI phrase with its review progress',any(v['word']=='climate change' and v['sentence']==first and v.get('srs') for v in backup['data']['vocab']))
     pg.evaluate('localStorage.clear()');pg.reload();pg.wait_for_selector('.coach-btn');pg.evaluate('x=>ER.applyBackup(x,"replace")',backup)
     check('backup import restores teaching and old paragraph records',records(pg)==before and pg.evaluate('ER.getTranslations()["2026-10-27#0"].text')=='旧的译文')
     pg.click('[data-coach="0"]');wait_done(pg)
@@ -127,10 +145,30 @@ with sync_playwright() as p:
     check('title tokenization preserves decimal temperatures',title.startswith('The 1.5°C') and pg.locator('#articleReader h2 .sent').count()==1)
     ctx.close()
     mob=browser.new_context(viewport={'width':390,'height':844},has_touch=True,is_mobile=True);mf=Fake();mob.route('https://**/*',lambda r:r.fulfill(status=204,body=''));mob.route('https://api.deepseek.com/**',mf.handle)
+    mf.lesson='''## 参考译文
+当人们谈论气候变化的影响时，通常会提到海平面上升、庄稼歉收或房屋受损。
+## 句子主干
+they usually mention … → 他们通常提到……，后面接三个并列的影响。
+## 翻译顺序
+1. When people talk about … → 当人们谈论……时，先交代背景。
+2. they usually mention … → 他们通常提到……，译出主干。
+3. rising seas, failed harvests or damaged homes → 海平面上升、庄稼歉收或房屋受损，顺译三个并列宾语。
+## 实用短语
+- **climate change**：气候变化；用于讨论环境问题。
+- **rising seas**：海平面上升；用于描述气候变化的影响。
+- **failed harvests**：庄稼歉收；用于描述农业损失。
+## 迁移提示
+遇到并列成分，先找共同支配它们的动词，再依次翻译。
+'''
     mp=mob.new_page();mp.on('pageerror',lambda e:errors.append(str(e)));mp.goto(BASE);mp.wait_for_selector('.coach-btn');mp.evaluate('k=>localStorage.setItem("er_ds_key",k)',KEY)
     mp.locator('[data-coach="0"]').tap();wait_done(mp)
     check('sentence coaching fits mobile width',mp.evaluate('document.documentElement.scrollWidth<=innerWidth+1'))
     check('mobile translation buttons remain easy to tap',mp.locator('[data-coach="0"]').bounding_box()['height']>=36)
+    check('each mobile useful phrase has a comfortable collection button',mp.locator('#coach0 .coach-save-phrase').count()==3 and all(b.bounding_box()['height']>=36 for b in mp.locator('#coach0 .coach-save-phrase').all()))
+    out=ROOT/'output'/'playwright';out.mkdir(parents=True,exist_ok=True)
+    mp.get_by_role('heading',name='实用短语',exact=True).scroll_into_view_if_needed();mp.screenshot(path=str(out/'sentence-coach-collect-mobile.png'),full_page=False)
+    mp.locator('#coach0 .coach-save-phrase').first.tap()
+    check('mobile phrase collection works',mp.evaluate("ER.findWord('climate change').zh")=='气候变化')
     out=ROOT/'output'/'playwright';out.mkdir(parents=True,exist_ok=True);mp.locator('#coach0').scroll_into_view_if_needed();mp.screenshot(path=str(out/'sentence-coach-mobile.png'),full_page=False)
     mob.close();browser.close()
 check('no runtime JavaScript errors',not errors)

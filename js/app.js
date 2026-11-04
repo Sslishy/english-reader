@@ -951,24 +951,37 @@ function lookup(raw){
 ER.lookup = lookup;
 
 /* ========== 发音 ========== */
-var audioEl=new Audio();
+var audioEl=new Audio(),wordAudioToken=0;
+var stopWordAudio=ER.stopWordAudio=function(){
+  wordAudioToken++;audioEl.onerror=null;
+  try{audioEl.pause();}catch(e){}
+  if(window.speechSynthesis)try{speechSynthesis.cancel();}catch(e){}
+};
+window.addEventListener('hashchange',stopWordAudio);
+window.addEventListener('pagehide',stopWordAudio);
 var speak = ER.speak = function(word,audioUrl){
   if(ER.stopLearningAudio)ER.stopLearningAudio();
+  stopWordAudio();var token=wordAudioToken;
   var fallbackUrl='https://dict.youdao.com/dictvoice?audio='+encodeURIComponent(word)+'&type='+(settings.accent==='en-GB'?1:2);
   var playUrl=function(u,onFail){
-    try{ audioEl.pause(); audioEl.onerror=function(){onFail&&onFail();}; audioEl.src=u; var p=audioEl.play(); if(p&&p.catch) p.catch(function(){onFail&&onFail();}); }
-    catch(e){onFail&&onFail();}
+    if(token!==wordAudioToken)return;
+    var failed=false,fail=function(){if(failed||token!==wordAudioToken)return;failed=true;audioEl.onerror=null;try{audioEl.pause();}catch(e){}if(onFail)onFail();};
+    try{ audioEl.pause();audioEl.onerror=fail;audioEl.src=u;var p=audioEl.play();if(p&&p.catch)p.catch(fail); }
+    catch(e){fail();}
   };
+  var unavailable=function(){if(token===wordAudioToken)toast('暂时无法自动发音，可按 Alt + P 或点发音按钮重试');};
   var tts=function(){
-    if(!('speechSynthesis' in window)){ playUrl(fallbackUrl,function(){toast('此浏览器不支持发音');}); return; }
+    if(token!==wordAudioToken)return;
+    if(!('speechSynthesis' in window)){playUrl(fallbackUrl,unavailable);return;}
     try{
       speechSynthesis.cancel();
       var u=new SpeechSynthesisUtterance(word); u.lang=settings.accent; u.rate=0.9;
       var vs=speechSynthesis.getVoices(); var v=vs.find(function(x){return x.lang===settings.accent;})||vs.find(function(x){return x.lang&&x.lang.replace('_','-').indexOf(settings.accent)===0;});
       if(v) u.voice=v;
-      else if(vs.length===0 && isTouch){ playUrl(fallbackUrl,null); return; }
+      else if(vs.length===0 && isTouch){ playUrl(fallbackUrl,unavailable); return; }
+      u.onerror=function(e){if(token===wordAudioToken&&e.error!=='canceled'&&e.error!=='interrupted')playUrl(fallbackUrl,unavailable);};
       speechSynthesis.speak(u);
-    }catch(e){toast('发音失败');}
+    }catch(e){playUrl(fallbackUrl,unavailable);}
   };
   if(audioUrl) playUrl(audioUrl,tts); else tts();
 };

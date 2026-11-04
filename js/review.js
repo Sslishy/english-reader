@@ -148,6 +148,7 @@ function calendarHtml(){
   }).join('')+'</div>';
 }
 function renderHome(msg){
+  if(ER.stopWordAudio)ER.stopWordAudio();
   S=null;
   var c=counts(), resume=savedSession(), seenMap=seen(), oldKnown=Object.keys(seenMap).filter(function(w){return seenMap[w]==='known'&&!ER.findWord(w);}).length;
   var h='<div class="card review-home"><div class="rv-head"><h2 style="margin:0;font-size:20px">今日复习</h2><span class="muted">'+esc(today())+'</span></div>';
@@ -232,6 +233,7 @@ function progressHtml(){
 }
 function bindQuit(){ $('btnQuit').onclick=function(){saveSession();summary(true);}; }
 function next(){
+  if(ER.stopWordAudio)ER.stopWordAudio();
   if(!S)return renderHome();
   if(S.date!==today()){clearSession();renderHome('<p class="hint">已进入新的一天，按最新到期情况重新安排。</p>');return;}
   while(S.idx<S.queue.length){var it=S.queue[S.idx];if(it.done||(it.kind==='test'&&!ER.findWord(it.word))){S.idx++;continue;}break;}
@@ -270,6 +272,7 @@ function renderCard(it){
     v.srs=SRS.markKnown(v.srs,today());ER.saveVocab();markSeen(v.word,'learn');it.done=true;S.known.push(v.word);
     S.queue.forEach(function(q){if(q.kind==='test'&&q.word===v.word)q.done=true;});saveSession();advance();
   };
+  ER.speak(v.word,v.audio);
 }
 function renderRecall(it,v){
   it.type='recall';it.skill=it.skill||'meaning';
@@ -312,6 +315,7 @@ function renderRecall(it,v){
     if(!it.revealed||it.done)return;
     Array.prototype.forEach.call($('recallRating').querySelectorAll('button'),function(b){b.disabled=true;});grade(it,v,a[1]);
   };});
+  ER.speak(v.word,v.audio);
 }
 
 /* ---------- 例句来源（句子填空） ---------- */
@@ -559,7 +563,7 @@ function renderTest(it){
     it.answer=blank.accept; it.baseWord=v.word; it.sentZh=sent.zh; it.sentSrc=sent.src;
     h+='<div class="hint">根据中文意思填入英文'+(ph?'短语':'单词')+'（填句子里出现的形式） · '+esc(sent.src)+'</div>'+
        '<div class="cloze-sent" id="clozeSent">'+blank.html+'</div>'+
-       '<div class="cloze-cue" id="clozeZh"><b>要表达的意思：</b>'+esc(zh)+'</div>'+sentenceChineseHtml(sent)+'<button id="btnClozeHint">提示英文首字母</button>'+  
+       '<div class="cloze-cue" id="clozeZh"><b>要表达的意思：</b>'+esc(zh)+'</div>'+sentenceChineseHtml(sent)+'<button id="btnClozeHint">提示英文首字母</button><p class="hint">提交后自动朗读答案</p>'+  
        '<div class="spell cloze"><input type="text" id="clozeInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="填入空缺内容"><button class="primary" id="btnCheck">确认</button></div>';
   } else if(type==='gaps'){
     var mask=gapMask(v.word, v.srs.stage, today());
@@ -706,7 +710,7 @@ function renderContext(it,v){
   // Missing/edited examples must not accidentally grade the meaning track as usage.
   it.type='context';var sent=resolveSentence(v);
   box.innerHTML='<div class="card">'+progressHtml()+'<div class="qcard" id="qCard" data-type="context"><span class="qtype">语境待补充</span>'+correctionHtml(v)+'<p class="hint">'+(sent?'原句未匹配到这个词，请在生词本笔记中检查词形。':'这个词暂无可用例句，先练词义。')+'</p><button class="primary" id="btnSkipContext">暂缓语境题</button></div></div>';
-  bindQuit();$('btnSkipContext').onclick=function(){
+  bindQuit();fillSentenceChinese();ER.speak(v.word,v.audio);$('btnSkipContext').onclick=function(){
     it.done=true;['meaning','usage','spelling'].forEach(function(k){var sk=v.srs.skills[k];if(sk.active&&sk.due<=today())sk.due=SRS.addDays(today(),1);});
     v.srs=SRS.normalize(v.srs,today());ER.saveVocab();saveSession();advance();
   };
@@ -762,10 +766,16 @@ function grade(it,v,result){
   fb.innerHTML='<b>'+title+'</b>'+(it.type==='recall'?'':correctionHtml(v,it))+
     '<p class="hint">'+(target.done?SKILL_NAME[it.skill]+'下次验证：'+esc(track.due):!it.first?'本词今日练习结束，不再循环。':it.isNew?'今天先到这里，明天隐藏答案再测。':'先继续其他词；本轮结束后，间隔足够的错词可选补练一次。')+'</p>';
   fillSentenceChinese();
+  if(it.type!=='recall'){
+    var spoken=it.type==='cloze'&&it.answer?it.answer:v.word,audio=spoken===v.word?v.audio:'';
+    var say=document.createElement('button');say.id='btnAnswerSay';say.type='button';say.textContent='🔊 再听一次';say.onclick=function(){ER.speak(spoken,audio);};fb.appendChild(say);
+    ER.speak(spoken,audio);
+  }
   var dont=$('btnDontKnow');if(dont)dont.hidden=true;
   var nb=$('btnNext');nb.disabled=false;nb.hidden=false;nb.onclick=advance;
 }
 function summary(early){
+  if(ER.stopWordAudio)ER.stopWordAudio();
   if(!S)return renderHome();
   var state=S,c=counts(),pending=Object.keys(S.targets).map(function(k){return S.targets[k];}).filter(function(x){return !x.done;}),completed=Object.keys(S.targets).map(function(k){return S.targets[k];}).filter(function(x){return x.done;});
   if(!early)clearSession();
@@ -797,7 +807,7 @@ document.addEventListener('keydown',function(e){
   var id=null,k=e.key.toLowerCase();
   if(e.altKey){
     if(k==='h')id=$('btnRecallHint')?'btnRecallHint':$('btnClozeHint')?'btnClozeHint':'btnHint';
-    if(k==='p')id='btnSay';
+    if(k==='p')id=$('btnAnswerSay')?'btnAnswerSay':'btnSay';
     if(k==='n')id=$('btnRecallSkip')?'btnRecallSkip':'btnDontKnow';
   }else if(e.key==='Escape'&&S)id='btnQuit';
   else if(e.key==='Enter'){
