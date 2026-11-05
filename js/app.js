@@ -48,7 +48,11 @@ var today = ER.today = function(){ return fakeToday || realToday(); };
 ER.setToday = function(d){ fakeToday = d && SRS.isYmd(d) ? d : null; updateBadge(); };
 
 /* ========== 设置 ========== */
-var settings = ER.settings = Object.assign({accent:'en-US',auto:false,size:'20',email:'',text:'',newPerDay:5,cet6:false,reviewMode:'reading'}, lsGet('er_settings',{}));
+var settings = ER.settings = Object.assign({accent:'en-US',auto:false,size:'20',email:'',text:'',newPerDay:3,cet6:false,reviewMode:'dictation',reviewLimit:15,retention:.9}, lsGet('er_settings',{}));
+if(settings.reviewPolicy!==6){
+  settings.reviewPolicy=6;settings.reviewMode='dictation';settings.newPerDay=Math.min(3,Math.max(0,+settings.newPerDay||0));settings.reviewLimit=15;settings.retention=.9;
+  lsSet('er_settings',settings,true);lsSet('er_settings_at',Date.now(),true);
+}
 function settingsSig(){ var o=Object.assign({},settings); delete o.text; return JSON.stringify(o); }
 var lastSettingsSig = settingsSig();
 var saveSettings = ER.saveSettings = function(noStamp){
@@ -212,7 +216,7 @@ ER.restoreKnownWords = function(entries){
 function inVocab(word){return !!ER.findWord(word);}
 function updateCount(){$('vocabCount').textContent=vocab.length;$('vocabCount2').textContent='（'+vocab.length+' 个）';}
 var updateBadge = ER.updateBadge = function(){
-  var n=vocab.filter(function(v){return SRS.isDue(v.srs,today(),settings.reviewMode==='balanced');}).length;
+  var p=ReviewPlan.plan(vocab,today(),settings,lsGet('er_daily',{})),n=p.items.length;
   var b=$('dueBadge'); b.textContent=n; b.hidden=!n; b.title='今天有 '+n+' 个词待复习';
 };
 function vocabKeys(){var s={};vocab.forEach(function(v){s[v.word.toLowerCase()]=1;(v.forms||[]).forEach(function(f){s[f]=1;});});return s;}
@@ -441,7 +445,7 @@ var hideZh=false;
 $('btnHideZh').onclick=function(){hideZh=!hideZh;this.textContent=hideZh?'显示中文':'遮住中文';renderVocab();};
 function srsPill(v){
   var s=v.srs, t=today(); if(!s) return '';
-  var due=SRS.dueDate(s,settings.reviewMode==='balanced');
+  var due=ReviewPlan.dueDate(v,settings);
   var stable=SRS.isMastered(s), label=stable?'词义已通过延迟验证':'词义阶段 '+s.stage+'/'+SRS.MAX_STAGE;
   if(due<=t) return '<span class="stage due">'+esc(label)+' · 今天复习</span>';
   return '<span class="stage'+(stable?' done':'')+'">'+esc(label)+' · '+esc(due.slice(5))+' 复习</span>';
@@ -458,7 +462,7 @@ function renderVocab(){
   var list=vocab.slice();
   var sort=$('vocabSort').value, srcF=$('vocabSrc').value;
   if(sort==='new') list.reverse(); else if(sort==='az') list.sort(function(a,b){return a.word.localeCompare(b.word);});
-  else if(sort==='due') list.sort(function(a,b){var ad=SRS.dueDate(a.srs,settings.reviewMode==='balanced'),bd=SRS.dueDate(b.srs,settings.reviewMode==='balanced');return ad<bd?-1:ad>bd?1:0;});
+  else if(sort==='due') list.sort(function(a,b){var ad=ReviewPlan.dueDate(a,settings),bd=ReviewPlan.dueDate(b,settings);return ad<bd?-1:ad>bd?1:0;});
   if(srcF==='reading') list=list.filter(function(v){return v.source==='reading';});
   else if(srcF==='cet') list=list.filter(function(v){return /^cet/.test(v.source);});
   else if(srcF==='manual') list=list.filter(function(v){return v.source==='manual';});
@@ -614,7 +618,10 @@ $('importFile').onchange=function(){
   r.readAsText(f);
 };
 /* ========== 同步用：导出 / 合并整份学习数据 ========== */
-function mergeDaily(a,b){ a=a||{}; b=b||{}; if(!b.date) return a; if(!a.date||b.date>a.date) return {date:b.date,newDone:+b.newDone||0}; if(b.date===a.date) return {date:a.date,newDone:Math.max(+a.newDone||0,+b.newDone||0)}; return a; }
+function mergeDaily(a,b){
+  a=a||{};b=b||{};if(!b.date)return a;if(!a.date||b.date>a.date)return Object.assign({},b);
+  if(b.date===a.date){var out=Object.assign({},a,b,{newDone:Math.max(+a.newDone||0,+b.newDone||0)});['reviewWords','introducedWords'].forEach(function(k){out[k]=Array.from(new Set((a[k]||[]).concat(b[k]||[])));});out.newDone=Math.max(out.newDone,out.introducedWords.length);return out;}return a;
+}
 ER.syncState = function(){
   var s=Object.assign({},settings); delete s.text;
   var st={app:'english-reader',format:1,vocab:vocab,tombstones:getTombs(),daily:lsGet('er_daily',{}),cetSeen:lsGet('er_cet_seen',{}),settings:s,settingsAt:+lsGet('er_settings_at',0)||0};

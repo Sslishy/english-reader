@@ -34,7 +34,7 @@ def entry(word, zh='词义测试', source='manual', **extra):
 def seed(page, entries, mode='reading', new=0):
     page.evaluate('''([entries,mode,n])=>{
       localStorage.clear();
-      localStorage.setItem('er_settings',JSON.stringify({newPerDay:n,reviewMode:mode}));
+      localStorage.setItem('er_settings',JSON.stringify({newPerDay:n,reviewMode:mode,reviewPolicy:6,reviewLimit:30}));
       localStorage.setItem('er_vocab',JSON.stringify(entries));
     }''', [entries, mode, new])
     page.reload()
@@ -149,7 +149,7 @@ with sync_playwright() as p:
         return ctx, pg
 
     ctx, page = profile()
-    check('fresh profile defaults to five new words and reading mode', page.input_value('#optNewPer') == '5' and page.input_value('#optReviewMode') == 'reading')
+    check('fresh profile defaults to three new words, dictation and a daily cap', page.input_value('#optNewPer') == '3' and page.input_value('#optReviewMode') == 'dictation' and page.input_value('#optReviewLimit')=='15')
 
     seed(page, [old('resilience', '韧性；恢复力')])
     migrated = word(page, 'resilience')['srs']
@@ -248,7 +248,7 @@ with sync_playwright() as p:
     check('missing context cannot trap same-day restarting', page.inner_text('#statDue')=='0')
 
     # Known words are cold-tested at the spot-check date instead of showing a study card again.
-    seed(page, [entry('resilience', '韧性；恢复力')])
+    seed(page, [entry('resilience', '韧性；恢复力')],new=1)
     start(page)
     page.click('#btnKnown')
     page.evaluate("ER.setToday('2026-11-09');ER.views.review.show()")
@@ -380,7 +380,7 @@ with sync_playwright() as p:
     while not page.locator('#retryIntro').count():
         step(page,'again');next_(page)
     page.click('#btnFinishReview')
-    check('optional correction can be skipped without losing tomorrow tasks', page.locator('#summaryCard').count()==1 and all(word(page,'skip'+str(i))['srs']['due']=='2026-11-03' for i in range(10)))
+    check('optional correction can be skipped without losing tomorrow tasks', page.locator('#summaryCard').count()==1 and all(word(page,'skip'+str(i))['srs']['skills'][word(page,'skip'+str(i))['srs']['history'][-1]['skill']]['due']=='2026-11-03' for i in range(10)))
 
     seed(page,[],new=5)
     start(page)

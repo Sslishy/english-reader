@@ -2,7 +2,6 @@
 (function(){
 'use strict';
 var ER = window.ER, $ = ER.$, esc = ER.esc;
-var DUE_CAP = 30;
 var TYPE_NAME = {recall:'主动回忆', spell:'拼写', en2zh:'英译汉', zh2en:'汉译英', order:'连词成句', cloze:'句子填空', gaps:'补全字母'};
 var ORDER_OVER = 6;      // 超过 6 个词的短语 / 句子：拼写题改为「连词成句」
 var box = $('reviewBox');
@@ -99,22 +98,27 @@ var SESSION_KEY='er_review_session';
 var SKILL_NAME={meaning:'词义',usage:'语境',spelling:'拼写'};
 var RETRY_GAP=8;
 function balanced(){ return ER.settings.reviewMode==='balanced'; }
-function saveSession(){ if(S) ER.lsSet(SESSION_KEY,{version:3,date:today(),session:S},true); }
+function dictation(){return ER.settings.reviewMode==='dictation';}
+function saveSession(){ if(S) ER.lsSet(SESSION_KEY,{version:4,date:today(),mode:ER.settings.reviewMode,limit:ReviewPlan.limit(ER.settings),session:S},true); }
 function clearSession(){ try{localStorage.removeItem(SESSION_KEY);}catch(e){} }
 function savedSession(){
   var d=ER.lsGet(SESSION_KEY,null);
   // The old queue could contain four copies of each ability. Keep saved SRS results,
   // but never resume that loop under the new one-word-per-day contract.
-  if(d&&d.version!==3){clearSession();return null;}
-  return d&&d.version===3&&d.date===today()&&d.session&&Array.isArray(d.session.queue)&&d.session.targets?d.session:null;
+  if(d&&(d.version!==4||d.mode!==ER.settings.reviewMode||d.limit!==ReviewPlan.limit(ER.settings))){clearSession();return null;}
+  return d&&d.version===4&&d.date===today()&&d.session&&Array.isArray(d.session.queue)&&d.session.targets?d.session:null;
 }
 function counts(){
   var v=ER.getVocab(), t=today(), d=daily();
-  var due=v.filter(function(x){return SRS.isDue(x.srs,t,balanced());}).length;
-  var requested=Math.max(0,(+ER.settings.newPerDay||0)-d.newDone);
-  var newLeft=due>=30?0:due>=15?Math.min(2,requested):requested;
-  return {due:due,mastered:v.filter(function(x){return SRS.isMastered(x.srs);}).length,total:v.length,
-    newLeft:newLeft,requested:requested,newDone:d.newDone};
+  var p=ReviewPlan.plan(v,t,ER.settings,d);p.mastered=v.filter(function(x){return SRS.isMastered(x.srs);}).length;
+  p.covered=v.filter(function(x){return x.srs.skills.spelling.reps>0;}).length;
+  p.scheduled=p.items.length+p.newSlots;p.requested=Math.max(0,(+ER.settings.newPerDay||0)-d.newDone);p.newDone=d.newDone;return p;
+}
+function markReviewWord(v,introduced){
+  var d=daily(),k=v.word.toLowerCase();d.reviewWords=d.reviewWords||[];
+  if(d.reviewWords.indexOf(k)<0)d.reviewWords.push(k);
+  if(introduced){d.introducedWords=d.introducedWords||[];if(d.introducedWords.indexOf(k)<0){d.introducedWords.push(k);d.newDone++;}}
+  saveDaily(d);
 }
 function retentionHtml(){
   var t=today(), yesterday=SRS.addDays(t,-1), week=SRS.addDays(t,-6);
@@ -141,7 +145,7 @@ function retentionHtml(){
     '<div class="weak-list">'+Object.keys(weak).map(function(k){return '<div><b>'+SKILL_NAME[k]+'待加强</b> '+(weak[k].length?esc(weak[k].slice(0,5).join(' · '))+(weak[k].length>5?' 等 '+weak[k].length+' 个':''):'暂无记录')+'</div>';}).join('')+'</div></div>';
 }
 function calendarHtml(){
-  var fc=SRS.forecast(ER.getVocab(), today(), 14, balanced()), wk='日一二三四五六';
+  var fc=ReviewPlan.forecast(ER.getVocab(), today(), ER.settings,14,daily()), wk='日一二三四五六';
   return '<div class="cal">'+fc.map(function(d,i){
     var dt=new Date(d.date+'T00:00:00Z');
     return '<div class="'+(d.count?'has ':'')+(i===0?'today':'')+'" title="'+d.date+'"><span>'+(i===0?'今天':d.date.slice(5))+' 周'+wk[dt.getUTCDay()]+'</span><b>'+d.count+'</b></div>';
@@ -153,28 +157,31 @@ function renderHome(msg){
   var c=counts(), resume=savedSession(), seenMap=seen(), oldKnown=Object.keys(seenMap).filter(function(w){return seenMap[w]==='known'&&!ER.findWord(w);}).length;
   var h='<div class="card review-home"><div class="rv-head"><h2 style="margin:0;font-size:20px">今日复习</h2><span class="muted">'+esc(today())+'</span></div>';
   if(msg) h+=msg;
-  h+='<p class="review-intro">写出意思，填出用法。每词先测一次，错词留到最后。</p>'+
-    '<div class="stats"><div class="stat"><b id="statDue">'+c.due+'</b>到期旧词 / 收藏词</div>'+
-    '<div class="stat"><b id="statNew">'+c.newLeft+'</b>建议补充新词</div>'+
-    '<div class="stat"><b>'+c.mastered+'</b>词义已通过延迟验证</div></div>'+
+  h+='<p class="review-intro">'+(dictation()?'听发音 → 拼写 → 核对意思和原句。所有单词分批练习，不必每天刷完生词本。':'写出意思，填出用法。每个词每天只测一次。')+'</p>'+
+    '<div class="stats"><div class="stat"><b id="statDue">'+c.scheduled+'</b>今天还安排</div>'+
+    '<div class="stat"><b id="statTodayDone">'+c.used+' / '+c.limit+'</b>今日已开始 / 每日上限</div>'+
+    '<div class="stat"><b id="statNew">'+c.newLeft+'</b>其中新词（占用同一上限）</div></div>'+
+    '<p class="hint" id="reviewBacklog">'+(c.remaining===0?'今天已达到上限，未完成任务可继续原来的进度。':'按到期和记忆情况优先安排。')+' 另有 '+c.pending+' 个词待分批安排。'+(dictation()?'听写练习已覆盖 '+c.covered+' / '+c.total+' 个词，尚未听写的已学词将逐步加入。':'')+'</p>'+
     '<div class="row">'+(resume?'<button class="primary big" id="btnResume">继续上次复习 →</button>':'')+
-    '<button class="'+(resume?'':'primary ')+'big" id="btnStart">'+(resume?'重新安排一轮':c.due||c.newLeft?'开始今日复习 →':'今日已完成 · 查看收尾')+'</button></div>'+
-    '<p class="hint">每轮最多 30 个到期词。新词先试每天 5 个，约 10–15 分钟；用时随练习量变化。'+(c.requested>c.newLeft?'旧词较多，今天暂减新词，完成旧词后再补充。':'')+'</p>'+
-    '<div class="review-settings"><label>学习重点 <select id="optReviewMode"><option value="reading"'+(!balanced()?' selected':'')+'>阅读：词义 + 语境</option><option value="balanced"'+(balanced()?' selected':'')+'>综合：加练拼写</option></select></label>'+
-    '<label>每天新词 <select id="optNewPer">'+[0,5,10,15,20,30].map(function(n){return '<option value="'+n+'"'+(+ER.settings.newPerDay===n?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label>'+
+    '<button class="'+(resume?'':'primary ')+'big" id="btnStart">'+(resume?'按剩余名额重新安排':c.scheduled?'开始今日复习 →':'今日计划已完成')+'</button></div>'+
+    '<p class="hint">每日合计最多 '+c.limit+' 个词，刷新、继续下一轮和切换模式都共用这个名额。'+(c.requested>c.newLeft?'旧词较多，今天自动减少新词。':'')+'</p>'+
+    '<div class="review-settings"><label>学习重点 <select id="optReviewMode"><option value="dictation"'+(dictation()?' selected':'')+'>听音拼写：覆盖所有词</option><option value="reading"'+(ER.settings.reviewMode==='reading'?' selected':'')+'>阅读：词义 + 语境</option><option value="balanced"'+(balanced()?' selected':'')+'>综合：分能力练习</option></select></label>'+
+    '<label>每日总量 <select id="optReviewLimit">'+[5,10,15,20,30].map(function(n){return '<option value="'+n+'"'+(c.limit===n?' selected':'')+'>'+n+' 个词</option>';}).join('')+'</select></label>'+
+    '<label>每天最多新词 <select id="optNewPer">'+[0,1,2,3,5,10,15,20,30].map(function(n){return '<option value="'+n+'"'+(+ER.settings.newPerDay===n?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label>'+
     '<label class="opt"><input type="checkbox" id="optCet6"'+(ER.settings.cet6?' checked':'')+'> 包含六级</label></div>'+
-    '<details class="review-help"><summary>这一轮会怎样帮助记忆？</summary><p>先复习旧词，再学收藏词和四六级词。词义题先写一个核心意思，再对照答案自评；语境题提供中文意思和例句中文，输入空缺的英文。不同能力分天安排，每词每天只做一次正式测试。</p><p>完成全部单词后，可以选择补练错词一次；与上次出现之间至少隔开 8 个不同词。只有三四个词或间隔不足时直接结束，留到明天验证。新词初练、提示和当天补练不算独立掌握。综合模式加练拼写，各能力进度分别保存。</p></details>'+
+    '<details class="review-help"><summary>这一轮会怎样帮助记忆？</summary><p>采用 FSRS 根据每个词的答题结果、间隔和记忆稳定性计算下次复习。目标记忆保留率为 90%，这是模型的安排目标，不是你的实际成绩。当前使用通用参数，尚未用你的历史训练个人参数。</p><p>听音拼写模式中，每个到期词都自动发音，隐藏英文后完整输入；长短语也要自己写。已经学过但没听写过的词分批补齐。新词先学习，再初练；看过答案和首字母提示不算独立掌握。错词留到下一天，不在当天反复循环。每日上限用来控制负担，积压较多时部分到期词会延后，页面会如实显示待安排数量。</p></details>'+
     (oldKnown?'<div class="known-recover"><p>旧版有 '+oldKnown+' 个词曾标记「我认识」而不再出现。</p><button id="btnRestoreKnown">恢复这些词的低频抽查</button></div>':'')+'</div>';
-  h+=keyboardHelp()+retentionHtml()+'<div class="card"><h3 class="card-title">未来 14 天复习量</h3>'+calendarHtml()+'</div>';
+  h+=keyboardHelp()+retentionHtml()+'<div class="card"><h3 class="card-title">未来 14 天分批安排</h3><p class="hint">按当前到期任务和每日上限估算，不含未来答题后的新安排。</p>'+calendarHtml()+'</div>';
   box.innerHTML=h;
   $('btnStart').onclick=function(){ startSession(false); };
   if(resume) $('btnResume').onclick=function(){
     S=resume; box.innerHTML='<div class="card">正在恢复复习…</div>';
     Promise.all([loadLists(),ensureExamples(),loadContextArticles()]).then(next).catch(function(){renderHome('<p class="err">恢复失败，请重试。</p>');});
   };
-  $('optReviewMode').onchange=function(){ER.settings.reviewMode=this.value;ER.saveSettings();ER.updateBadge();renderHome();};
+  $('optReviewMode').onchange=function(){ER.settings.reviewMode=this.value;ER.saveSettings();clearSession();ER.updateBadge();renderHome();};
+  $('optReviewLimit').onchange=function(){ER.settings.reviewLimit=+this.value;ER.saveSettings();clearSession();ER.updateBadge();renderHome();};
   $('optCet6').onchange=function(){ER.settings.cet6=this.checked;ER.saveSettings();};
-  $('optNewPer').onchange=function(){ER.settings.newPerDay=+this.value;ER.saveSettings();renderHome();};
+  $('optNewPer').onchange=function(){ER.settings.newPerDay=+this.value;ER.saveSettings();clearSession();ER.updateBadge();renderHome();};
   if(oldKnown) $('btnRestoreKnown').onclick=function(){
     this.disabled=true;
     Promise.all(['cet4','cet6'].map(function(l){return ER.loadCet(l).then(function(a){cetLists[l]=a;return a;});})).then(function(lists){
@@ -185,6 +192,7 @@ function renderHome(msg){
 function targetKey(it){return it.word.toLowerCase()+'|'+it.skill;}
 function addTest(q,v,skill,isNew){q.push({kind:'test',word:v.word,skill:skill,first:true,retry:0,isNew:!!isNew});}
 function chooseSkill(v,index){
+  if(dictation())return 'spelling';
   var sk=v.srs.skills,t=today();
   var due=['meaning','usage','spelling'].filter(function(k){return (k!=='spelling'||balanced())&&sk[k].active&&sk[k].due<=t;});
   if(v.srs.added===SRS.addDays(t,-1)&&due.indexOf('meaning')>=0)return 'meaning';
@@ -202,18 +210,12 @@ function chooseSkill(v,index){
 function startSession(){
   box.innerHTML='<div class="card"><p class="muted"><span class="spinner"></span>正在准备今天的单词…</p></div>';
   Promise.all([loadLists(),ensureExamples(),loadContextArticles()]).then(function(){
-    var t=today(), c=counts(), q=[], news=pickNew(c.newLeft);
-    var due=SRS.dueList(ER.getVocab(),t,0,balanced()).sort(function(a,b){
-      var freshA=!(a.srs.reps||0), freshB=!(b.srs.reps||0);
-      if(freshA!==freshB) return freshA?1:-1;
-      var da=SRS.dueDate(a.srs,balanced()), db=SRS.dueDate(b.srs,balanced());
-      return da<db?-1:da>db?1:(b.srs.lapses||0)-(a.srs.lapses||0);
-    }).slice(0,DUE_CAP);
+    var t=today(), c=counts(), q=[], news=pickNew(c.newSlots),due=c.items;
     due.forEach(function(v,index){
-      if(!(v.srs.reps||0)&&!v.srs.skills.meaning.known){q.push({kind:'card',word:v.word});addTest(q,v,'meaning',true);return;}
+      if(!(v.srs.reps||0)&&!v.srs.skills.meaning.known){q.push({kind:'card',word:v.word});addTest(q,v,dictation()?'spelling':'meaning',true);return;}
       addTest(q,v,chooseSkill(v,index),false);
     });
-    news.forEach(function(x){q.push({kind:'card',cet:x,word:x.word});addTest(q,x,'meaning',true);});
+    news.forEach(function(x){q.push({kind:'card',cet:x,word:x.word});addTest(q,x,dictation()?'spelling':'meaning',true);});
     // Round-robin by word keeps its card/meaning/usage/spelling apart where possible.
     var groups=Object.create(null), order=[];
     q.forEach(function(it){if(!groups[it.word]){groups[it.word]=[];order.push(it.word);}groups[it.word].push(it);});
@@ -221,8 +223,8 @@ function startSession(){
     while(order.some(function(w){return groups[w].length;})){
       order.forEach(function(w){if(groups[w].length)q.push(groups[w].shift());});
     }
-    if(!q.length){clearSession();renderHome('<p class="feedback ok">今天的到期词和新词任务已完成。明天回来看看还能想起多少。</p>');return;}
-    S={date:t,queue:q,idx:0,correct:0,wrong:0,assisted:0,reset:[],advanced:[],learned:[],known:[],retryOk:0,targets:{},exposures:{},startDue:due.length,mainEnd:q.length,retriesPrepared:false,retryStarted:false};
+    if(!q.length){clearSession();renderHome('<p class="feedback ok">今天的计划已完成。其余词按每日上限分批安排，明天再来。</p>');return;}
+    S={date:t,mode:ER.settings.reviewMode,queue:q,idx:0,correct:0,wrong:0,assisted:0,reset:[],advanced:[],learned:[],known:[],retryOk:0,targets:{},exposures:{},startDue:due.length,mainEnd:q.length,retriesPrepared:false,retryStarted:false};
     saveSession();next();
   }).catch(function(e){renderHome('<p class="err">准备失败：'+esc(e.message||e)+'。请通过 http(s) 打开网站后重试。</p>');});
 }
@@ -260,15 +262,16 @@ function renderCard(it){
   var v=ER.findWord(it.word),x=it.cet;
   if(!v&&x){
     v=ER.addWord({word:x.word,phonetic:x.phonetic,zh:x.zh,sentence:x.ex,sentence_zh:x.exzh,source:x.level});
-    markSeen(x.word,'learn');var d=daily();d.newDone++;saveDaily(d);
+    markSeen(x.word,'learn');
   }
   if(!v){it.done=true;advance();return;}
+  markReviewWord(v,true);
   S.exposures=S.exposures||{};S.exposures['word:'+v.word]=S.idx;saveSession();
   box.innerHTML='<div class="card">'+progressHtml()+'<div class="qcard"><span class="qtype newcard">'+(x?'补充新词':'阅读 / 手动收藏')+'</span>'+correctionHtml(v)+
-    '<p class="hint">先抓住一个核心意思，读一遍原句。稍后会收起答案，让你自己回忆。</p><div class="row recall-actions"><button id="btnSay">🔊 听发音</button><button class="primary big" id="btnGotIt">开始记忆，稍后回忆 →</button><button id="btnKnown">已认识，改为 7 天后抽查</button></div></div></div>';
+    '<p class="hint">先抓住一个核心意思，读一遍原句。稍后会收起答案，让你自己回忆。</p><div class="row recall-actions"><button id="btnSay">🔊 听发音</button><button class="primary big" id="btnGotIt">'+(dictation()?'开始听音拼写 →':'开始记忆，稍后回忆 →')+'</button>'+(dictation()?'':'<button id="btnKnown">已认识，改为 7 天后抽查</button>')+'</div></div></div>';
   bindQuit();fillSentenceChinese();$('btnSay').onclick=function(){ER.speak(v.word,v.audio);};
   $('btnGotIt').onclick=function(){it.done=true;if(S.learned.indexOf(v.word)<0)S.learned.push(v.word);saveSession();advance();};
-  $('btnKnown').onclick=function(){
+  if($('btnKnown'))$('btnKnown').onclick=function(){
     v.srs=SRS.markKnown(v.srs,today());ER.saveVocab();markSeen(v.word,'learn');it.done=true;S.known.push(v.word);
     S.queue.forEach(function(q){if(q.kind==='test'&&q.word===v.word)q.done=true;});saveSession();advance();
   };
@@ -514,7 +517,7 @@ function distractors(target, field, n){
 /* 测试题 */
 function pickType(v,it){
   if(it.keepType) return it.keepType;
-  if(it.skill==='spelling') return isPhrase(v)&&tokens(v.word).length>ORDER_OVER?'order':'spell';
+  if(it.skill==='spelling') return !dictation()&&isPhrase(v)&&tokens(v.word).length>ORDER_OVER?'order':'spell';
   if(it.skill==='usage'){
     var sent=resolveSentence(v);
     if(sent&&clozeBlank(v,sent.en))return 'cloze';
@@ -534,6 +537,7 @@ function checkExposure(it){
 }
 function renderTest(it){
   var v=ER.findWord(it.word);
+  markReviewWord(v,false);
   var ph=isPhrase(v), toks=tokens(v.word);
   checkExposure(it);
   var type=pickType(v, it);
@@ -599,17 +603,20 @@ function renderTest(it){
   if(type==='spell'){
     ER.speak(v.word, v.audio);
     var inp=$('spellInput'); setTimeout(function(){ try{inp.focus();}catch(e){} },50);
-    $('btnHint').onclick=function(){ it.assisted=true; saveSession(); inp.placeholder= ph? toks.map(function(t){var c=t.replace(/^[^\p{L}\p{N}]+/u,''); return (c[0]||t[0])+'…';}).join(' ') : v.word[0]+' _ _ _'; this.disabled=true; };
+    inp.value=it.draft||'';inp.oninput=function(){if(!it.done){it.draft=inp.value;saveSession();}};
+    function spellHint(){it.assisted=true;it.spellHintUsed=true;saveSession();inp.placeholder=ph?toks.map(function(t){var c=t.replace(/^[^\p{L}\p{N}]+/u,'');return (c[0]||t[0])+'…';}).join(' '):v.word[0]+' _ _ _';$('btnHint').disabled=true;}
+    $('btnHint').onclick=spellHint;if(it.spellHintUsed)spellHint();
     var check=function(){
       if(it.done||inp.readOnly) return;
       var ok= ph? normPhrase(inp.value)===normPhrase(v.word) : norm(inp.value)===norm(v.word);
       if(!inp.value.trim()){ inp.focus(); return; }
+      it.response=inp.value.trim();
       inp.readOnly=true; inp.classList.add(ok?'right':'wrong'); $('btnCheck').disabled=true;
       if(!ok) it.diff=ph?diffHtml(inp.value,v.word):letterDiff(inp.value,v.word);
       grade(it, v, ok);
     };
     $('btnCheck').onclick=check;
-    inp.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); if(inp.readOnly){ var n=$('btnNext'); if(n&&!n.hidden) n.click(); } else check(); } });
+    inp.addEventListener('keydown',function(e){if(e.isComposing||e.keyCode===229)return; if(e.key==='Enter'){ e.preventDefault(); if(inp.readOnly){ var n=$('btnNext'); if(n&&!n.hidden) n.click(); } else check(); } });
   } else if(type==='order'){
     ER.speak(v.word, v.audio);
     var ans=$('orderAns'), pool=$('orderPool');
@@ -642,7 +649,7 @@ function renderTest(it){
       grade(it, v, ok);
     };
     $('btnCheck').onclick=checkC;
-    cin.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); if(cin.readOnly){ var n=$('btnNext'); if(n&&!n.hidden) n.click(); } else checkC(); } });
+    cin.addEventListener('keydown',function(e){if(e.isComposing||e.keyCode===229)return; if(e.key==='Enter'){ e.preventDefault(); if(cin.readOnly){ var n=$('btnNext'); if(n&&!n.hidden) n.click(); } else checkC(); } });
   } else if(type==='gaps'){
     ER.speak(v.word, v.audio);
     var inputs=Array.prototype.slice.call(box.querySelectorAll('.gap-in'));
@@ -674,6 +681,7 @@ function renderTest(it){
         if(inp.value && idx+1<inputs.length) inputs[idx+1].focus();
       });
       inp.addEventListener('keydown',function(e){
+        if(e.isComposing||e.keyCode===229)return;
         if(locked){ if(e.key==='Enter'){ e.preventDefault(); var n=$('btnNext'); if(n&&!n.hidden) n.click(); } return; }
         if(e.key==='Backspace' && !inp.value && idx>0){ e.preventDefault(); inputs[idx-1].value=''; inputs[idx-1].focus(); }
         else if(e.key==='Enter'){ e.preventDefault(); checkG(); }
@@ -717,6 +725,7 @@ function renderContext(it,v){
 }
 function prepareRetries(){
   S.retriesPrepared=true;
+  if(dictation()){saveSession();return;}
   // Build one final batch only after all first attempts. Retries never create retries.
   S.queue.slice(0,S.mainEnd).forEach(function(it,index){
     if(it.kind!=='test'||!it.done||it.isNew)return;
@@ -743,15 +752,16 @@ function grade(it,v,result){
   target.attempts++;
   // A correction never replaces the first answer; tomorrow's cold success clears pending.
   if(it.first)target.done=independent;
-  v.srs=SRS.record(v.srs,{skill:it.skill,rating:rating,date:today(),assisted:!!it.assisted,practice:!it.first,self:it.type==='recall',response:it.response,task:it.type==='cloze'?'cloze_zh':it.type});
+  v.srs=SRS.record(v.srs,{skill:it.skill,rating:rating,date:today(),assisted:!!it.assisted,practice:!it.first,self:it.type==='recall',response:it.response,scheduler:'fsrs',retention:ER.settings.retention,task:it.type==='cloze'?'cloze_zh':it.type});
   v.srs.skills[it.skill].learningPending=!target.done;
   var tomorrow=SRS.addDays(today(),1),track=v.srs.skills[it.skill];
   if(!target.done&&track.due>tomorrow)track.due=tomorrow;
   if(it.first){
     // Other abilities are scheduled on another day, with no invented answer or promotion.
-    ['meaning','usage','spelling'].forEach(function(k){if(k!==it.skill&&v.srs.skills[k].active&&v.srs.skills[k].due<=today())v.srs.skills[k].due=tomorrow;});
-    var sent=resolveSentence(v);
-    if(!v.srs.skills.usage.active&&sent&&clozeBlank(v,sent.en)){v.srs.skills.usage.active=true;v.srs.skills.usage.due=tomorrow;}
+    if(!dictation()){
+      var sent=resolveSentence(v);
+      if(!v.srs.skills.usage.active&&sent&&clozeBlank(v,sent.en)){v.srs.skills.usage.active=true;v.srs.skills.usage.due=tomorrow;}
+    }
     if(balanced()&&!v.srs.skills.spelling.active){v.srs.skills.spelling.active=true;v.srs.skills.spelling.due=tomorrow;}
     if(independent){S.correct++;if(S.advanced.indexOf(v.word)<0)S.advanced.push(v.word);}
     else if(rating==='good')S.assisted++;
@@ -785,7 +795,7 @@ function summary(early){
   if(completed.length)h+='<p><b>本轮已通过</b></p><div class="pill-list ok">'+completed.map(function(x){return '<span>'+esc(x.word)+' · '+SKILL_NAME[x.skill]+'</span>';}).join('')+'</div>';
   if(pending.length)h+='<p><b>仍需加强'+(early?'':'，明天再验证')+'</b></p><div class="pill-list" id="sumReset">'+pending.map(function(x){return '<span>'+esc(x.word)+' · '+SKILL_NAME[x.skill]+'</span>';}).join('')+'</div>';
   if(S.known.length)h+='<p class="hint">已保留低频抽查：'+S.known.map(esc).join('、')+'</p>';
-  h+='<div class="row" style="margin-top:20px">'+(early?'<button class="primary" id="btnContinue">继续这一轮</button>':'')+(c.due?'<button id="btnAgain">继续剩余 '+c.due+' 个到期词</button>':'')+'<button id="btnHome">返回复习首页</button></div></div>'+retentionHtml();
+  h+='<p class="hint">今天已使用 '+c.used+' / '+c.limit+' 个名额。'+(c.remaining===0?'已达到每日上限，剩余词分批安排。':'还可安排 '+c.remaining+' 个词。')+'</p><div class="row" style="margin-top:20px">'+(early?'<button class="primary" id="btnContinue">继续这一轮</button>':'')+(!early&&c.scheduled?'<button id="btnAgain">继续今日剩余名额（'+c.scheduled+' 个）</button>':'')+'<button id="btnHome">返回复习首页</button></div></div>'+retentionHtml();
   S=null;box.innerHTML=h;$('btnHome').onclick=function(){renderHome();};
   if(early)$('btnContinue').onclick=function(){S=state;next();};
   if($('btnAgain'))$('btnAgain').onclick=function(){startSession();};

@@ -8,6 +8,34 @@
   var TYPES = ['spell', 'en2zh', 'zh2en', 'cloze', 'gaps'];
   var SKILLS = ['meaning', 'usage', 'spelling'];
   var HISTORY_LIMIT = 200;
+  var FS = root.FSRS || (typeof require==='function' ? require('./vendor/ts-fsrs-5.2.3.js') : null);
+  var engines=Object.create(null);
+  function engine(retention){var r=Math.max(.8,Math.min(.95,+retention||.9));return engines[r]||(engines[r]=FS.fsrs({request_retention:r,enable_fuzz:false,enable_short_term:false,maximum_interval:365}));}
+  function memoryCard(sk,date){
+    var f=sk.fsrs,card=FS.createEmptyCard(new Date(date+'T00:00:00Z'));
+    if(f&&Number.isFinite(f.stability)&&f.stability>0&&Number.isFinite(f.difficulty)&&f.difficulty>=1&&f.difficulty<=10&&isYmd(f.last_review)){
+      Object.assign(card,{stability:f.stability,difficulty:f.difficulty,state:FS.State.Review,reps:count(f.reps),lapses:count(f.lapses),scheduled_days:count(f.scheduled_days),last_review:new Date(f.last_review+'T00:00:00Z'),due:new Date(sk.due+'T00:00:00Z')});
+    }
+    return card;
+  }
+  function scheduleMemory(s,skill,rating,date,retention){
+    if(!FS)throw new Error('FSRS 调度组件未加载，请刷新页面');
+    var sk=s.skills[skill],f=engine(retention),card=memoryCard(sk,date);
+    if(!card.last_review){
+      s.history.filter(function(h){return h.skill===skill&&h.first&&!h.practice&&!h.assisted&&h.date<date;}).forEach(function(h){
+        card=f.next(card,new Date(h.date+'T00:00:00Z'),h.rating==='good'?FS.Rating.Good:h.rating==='hard'?FS.Rating.Hard:FS.Rating.Again).card;
+      });
+    }
+    var next=f.next(card,new Date(date+'T00:00:00Z'),rating==='good'?FS.Rating.Good:rating==='hard'?FS.Rating.Hard:FS.Rating.Again).card;
+    var interval=rating==='again'?1:Math.max(1,Math.min(365,diffDays(date,next.due.toISOString().slice(0,10))));
+    sk.fsrs={version:6,stability:next.stability,difficulty:next.difficulty,reps:next.reps,lapses:next.lapses,scheduled_days:interval,last_review:date};
+    sk.due=addDays(date,interval);
+  }
+  function retrievability(srs,skill,date){
+    var sk=srs&&srs.skills&&srs.skills[skill];if(!sk||!sk.fsrs||!FS)return null;
+    var card=memoryCard(sk,date);if(!card.last_review)return null;
+    return engine(.9).get_retrievability(card,new Date(date+'T00:00:00Z'),false);
+  }
   function pad(n) { return String(n).padStart(2, '0'); }
   function parse(ymd) { var p = String(ymd).split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]); }
   function fmt(ms) { var d = new Date(ms); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
@@ -95,6 +123,7 @@
       sk.due=sk.due<addDays(date,1) ? sk.due : addDays(date,1);
       sk.lastRating='again'; sk.successDates=[]; sk.delayedSuccess=false; sk.known=false;
     }
+    if(first&&!assisted&&(opt.scheduler==='fsrs'||sk.fsrs))scheduleMemory(s,skill,rating,date,opt.retention);
     // practice 不改变 due/stage；即使先做补练，也不能把已经逾期的正式复习推迟。
     return syncLegacy(s);
   }
@@ -142,5 +171,5 @@
   }
   root.SRS={INTERVALS:INTERVALS,MAX_STAGE:MAX_STAGE,MASTERED_INTERVAL:MASTERED_INTERVAL,TYPES:TYPES,SKILLS:SKILLS,HISTORY_LIMIT:HISTORY_LIMIT,
     addDays:addDays,diffDays:diffDays,isYmd:isYmd,init:init,normalize:normalize,record:record,nextSkill:nextSkill,isMastered:isMastered,markKnown:markKnown,
-    answer:answer,practice:practice,dueDate:dueDate,isDue:isDue,dueList:dueList,forecast:forecast,stageLabel:stageLabel,hash:hash,qtype:qtype};
+    answer:answer,practice:practice,dueDate:dueDate,isDue:isDue,dueList:dueList,forecast:forecast,stageLabel:stageLabel,hash:hash,qtype:qtype,retrievability:retrievability};
 })(typeof window !== 'undefined' ? window : this);

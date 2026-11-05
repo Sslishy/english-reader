@@ -251,8 +251,9 @@ with sync_playwright() as p:
 
     # ---------- 3. active recall review (detailed cases live in test_review.py) ----------
     page.click('a[data-tab="review"]'); page.wait_for_selector("#statDue")
-    check("review defaults to 5 new words", page.inner_text("#statNew") == "5")
-    page.select_option("#optNewPer", "0")
+    check("review defaults to capped dictation with up to three new words", page.input_value('#optReviewMode')=='dictation' and page.inner_text("#statNew") == "3")
+    page.select_option('#optReviewMode','reading')
+    page.select_option("#optNewPer", "2")
     types, retries = run_session(page, wrong={"emission"})
     check("review uses active recall", "recall" in types, str(types))
     e, s = word(page, "emission"), word(page, "scenario")
@@ -419,7 +420,8 @@ with sync_playwright() as p:
 
     # ---------- 11. phrases use the same independent-recall workflow ----------
     pp.click('a[data-tab="review"]'); pp.wait_for_selector("#statDue")
-    pp.select_option("#optNewPer", "0")
+    pp.select_option('#optReviewMode','reading')
+    pp.select_option("#optNewPer", "10")
     qlog = []
     run_session(pp, wrong={"global climate policy", LONG}, log=qlog)
     check("phrases participate in recall review", all(any(e["word"] == w for e in qlog) for w in ["sobering message", "make ends meet", LONG]))
@@ -493,7 +495,7 @@ with sync_playwright() as p:
     check("mobile: manual add works", word(mq, "Food grown close to consumers travels shorter distances") is not None)
     check("mobile: vocab page no horizontal overflow", mq.evaluate("document.documentElement.scrollWidth<=window.innerWidth+1"))
     mq.screenshot(path="/tmp/er_mobile_vocab.png", full_page=True)
-    mq.evaluate("ER.settings.newPerDay=0;ER.saveSettings()")
+    mq.evaluate("ER.settings.newPerDay=2;ER.settings.reviewMode='reading';ER.saveSettings()")
     mq.goto(f"{BASE}?today=2026-10-23#/review"); mq.wait_for_selector("#btnStart")
     mlog, shots = [], {}
     run_session(mq, log=mlog, tap=True, shots=shots)

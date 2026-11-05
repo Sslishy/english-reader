@@ -1,0 +1,6 @@
+ts-fsrs 5.2.3 (FSRS-6), MIT
+Official repository: https://github.com/open-spaced-repetition/ts-fsrs/tree/v5.2.3
+Published tarball: https://registry.npmjs.org/ts-fsrs/-/ts-fsrs-5.2.3.tgz
+Tarball SHA-512: 47722371e0bd59f9ef5229fa371f83c2a13387742297a1a0db2107aafa1c51c0bb35b8bec43ac583fd5f29a6014f4b4979d0e70c082e5cc497d218a3862f39f7
+Unmodified dist/index.umd.js SHA-256: 86d829291cfcca322068f86673697ada4c14b801a5e415e88092e3c8b63c2e9c
+The tarball was checked against the npm registry integrity field before copying.
