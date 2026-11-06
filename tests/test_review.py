@@ -34,7 +34,7 @@ def entry(word, zh='词义测试', source='manual', **extra):
 def seed(page, entries, mode='reading', new=0):
     page.evaluate('''([entries,mode,n])=>{
       localStorage.clear();
-      localStorage.setItem('er_settings',JSON.stringify({newPerDay:n,reviewMode:mode,reviewPolicy:6,reviewLimit:30}));
+      localStorage.setItem('er_settings',JSON.stringify({newPerDay:n,reviewMode:mode,reviewPolicy:7,reviewLimit:30}));
       localStorage.setItem('er_vocab',JSON.stringify(entries));
     }''', [entries, mode, new])
     page.reload()
@@ -149,7 +149,7 @@ with sync_playwright() as p:
         return ctx, pg
 
     ctx, page = profile()
-    check('fresh profile defaults to three new words, dictation and a daily cap', page.input_value('#optNewPer') == '3' and page.input_value('#optReviewMode') == 'dictation' and page.input_value('#optReviewLimit')=='15')
+    check('fresh profile defaults to three new words, dictation and thirty per mode', page.input_value('#optNewPer') == '3' and page.input_value('#optReviewMode') == 'dictation' and page.input_value('#optReviewLimit')=='30')
 
     seed(page, [old('resilience', '韧性；恢复力')])
     migrated = word(page, 'resilience')['srs']

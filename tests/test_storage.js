@@ -45,12 +45,15 @@ test('New defaults and explicit stored study settings', () => {
   const fresh = app();
   assert.equal(fresh.ER.settings.newPerDay, 3);
   assert.equal(fresh.ER.settings.reviewMode, 'dictation');
-  assert.equal(fresh.ER.settings.reviewLimit, 15);
+  assert.equal(fresh.ER.settings.reviewLimit, 30);
+  assert.deepEqual(clone(fresh.ER.settings.reviewLimits),{dictation:30,reading:30,balanced:30});
   const previous = app({er_settings: {newPerDay: 0, reviewMode: 'balanced'}});
   assert.equal(previous.ER.settings.newPerDay, 0);
   assert.equal(previous.ER.settings.reviewMode, 'dictation');
-  const explicit = app({er_settings:{newPerDay:0,reviewMode:'balanced',reviewPolicy:6,reviewLimit:10}});
+  const explicit = app({er_settings:{newPerDay:0,reviewMode:'balanced',reviewPolicy:7,reviewLimit:10}});
   assert.equal(explicit.ER.settings.reviewMode,'balanced');assert.equal(explicit.ER.settings.reviewLimit,10);
+  const v6=app({er_settings:{newPerDay:0,reviewMode:'reading',reviewPolicy:6,reviewLimit:15}});
+  assert.equal(v6.ER.settings.newPerDay,0);assert.equal(v6.ER.settings.reviewMode,'reading');assert.equal(v6.ER.settings.reviewLimits.reading,30);
 });
 
 test('Nested skill progress and history survive backup, replacement, and reload', () => {
@@ -99,7 +102,7 @@ test('Old known words return as spot checks and survive stale remote tombstones'
   assert.ok(a.ER.findWord('existing'));
 });
 
-test('Reading badge excludes spelling-only backlog, balanced mode includes it', () => {
+test('Badge counts available mode practice even if only another skill is due', () => {
   const a = app();
   const v = a.ER.addWord({word: 'retain', zh: '记住'});
   v.srs = a.SRS.record(v.srs, {skill: 'meaning', rating: 'good', date: '2026-11-02'});
@@ -107,16 +110,17 @@ test('Reading badge excludes spelling-only backlog, balanced mode includes it', 
   v.srs.skills.meaning.due='2026-11-15';a.ER.setToday('2026-11-03');
   a.ER.saveVocab();
   a.ER.settings.reviewMode = 'reading'; a.ER.updateBadge();
-  assert.equal(a.element('dueBadge').hidden, true);
+  assert.equal(a.element('dueBadge').hidden, false);
   a.ER.settings.reviewMode = 'balanced'; a.ER.updateBadge();
   assert.equal(a.element('dueBadge').hidden, false);
   assert.equal(a.element('dueBadge').textContent, 1);
 });
-test('Daily admissions merge across devices instead of resetting the shared budget',()=>{
-  const a=app({er_daily:{date:'2026-11-02',newDone:1,reviewWords:['alpha'],introducedWords:['alpha']}});
-  a.ER.mergeRemoteState({app:'english-reader',daily:{date:'2026-11-02',newDone:1,reviewWords:['beta'],introducedWords:['beta']}});
+test('Daily admissions merge independently for each mode across devices',()=>{
+  const a=app({er_daily:{date:'2026-11-02',newDone:1,reviewWords:['alpha'],introducedWords:['alpha'],modes:{dictation:{reviewWords:['alpha']}}}});
+  a.ER.mergeRemoteState({app:'english-reader',daily:{date:'2026-11-02',newDone:1,reviewWords:['beta'],introducedWords:['beta'],modes:{reading:{reviewWords:['beta']},dictation:{reviewWords:['gamma']}}}});
   const d=JSON.parse(a.stored.get('er_daily'));
   assert.deepEqual(d.reviewWords.sort(),['alpha','beta']);assert.deepEqual(d.introducedWords.sort(),['alpha','beta']);
+  assert.deepEqual(d.modes.dictation.reviewWords.sort(),['alpha','gamma']);assert.deepEqual(d.modes.reading.reviewWords,['beta']);
 });
 
 console.log(`${count} storage integration tests passed.`);

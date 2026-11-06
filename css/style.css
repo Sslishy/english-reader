@@ -382,6 +382,7 @@ body.sheet-open main{padding-bottom:55vh}
 /* Written recall, Chinese-supported production, and sentence translation coaching. */
 .review-keys{font-size:13px;color:var(--muted);margin:0 0 14px;line-height:1.9;text-align:left}
 .review-keys summary{cursor:pointer}
+.mode-progress{font-size:13px;line-height:1.8;color:var(--muted);margin:8px 0 14px;overflow-wrap:anywhere}
 kbd{font:12px/1.5 system-ui,sans-serif;border:1px solid #cad3df;border-bottom-width:2px;border-radius:4px;background:#f8fafc;padding:1px 5px;white-space:nowrap}
 .cloze-cue{margin:14px auto 8px;padding:12px 16px;max-width:580px;background:#fff6df;border-radius:8px;text-align:left;font:16px/1.7 system-ui,sans-serif;color:#694b17;overflow-wrap:anywhere}
 .context-zh{margin:10px auto 14px;max-width:620px;text-align:left;font:16px/1.8 system-ui,sans-serif;color:#3a526c;overflow-wrap:anywhere}

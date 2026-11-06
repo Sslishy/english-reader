@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[1];DAY='2026-11-05';checks=[];errors=[]
 def check(name,ok):checks.append(bool(ok));print(('PASS ' if ok else 'FAIL ')+name,flush=True)
 def old(word):return {'word':word,'zh':'测试词义','sentence':'They discussed '+word+' yesterday.','sentence_zh':'他们昨天讨论了这个词。','srs':{'stage':2,'due':DAY,'reps':2,'last':'2026-10-30','added':'2026-10-20'}}
 def seed(pg,entries,**settings):
-    cfg={'reviewPolicy':6,'reviewMode':'dictation','reviewLimit':15,'newPerDay':0,**settings}
+    cfg={'reviewPolicy':7,'reviewMode':'dictation','reviewLimit':15,'newPerDay':0,**settings}
     pg.evaluate('([v,s])=>{localStorage.clear();localStorage.setItem("er_vocab",JSON.stringify(v));localStorage.setItem("er_settings",JSON.stringify(s));}',[entries,cfg]);pg.reload();pg.wait_for_selector('#statDue')
 def state(pg):return pg.evaluate('ER.views.review.state()')
 def start(pg):pg.click('#btnStart');pg.wait_for_selector('#qCard,#btnGotIt,#statDue')
@@ -17,7 +17,13 @@ def finish(pg):
     for _ in range(50):
         if pg.locator('#summaryCard').count():return words
         if pg.locator('#btnGotIt').count():pg.click('#btnGotIt');continue
-        s=state(pg);word=s['queue'][s['idx']]['word'];words.append(word);answer(pg,word);pg.keyboard.press('Enter')
+        s=state(pg);it=s['queue'][s['idx']];word=it['word'];words.append(word)
+        if it['type']=='recall':
+            pg.fill('#recallInput','测试词义');pg.click('#btnReveal');pg.click('#btnRecallGood')
+        elif it['type']=='cloze':
+            pg.fill('#clozeInput',it['answer']);pg.click('#btnCheck')
+        else:answer(pg,word)
+        pg.keyboard.press('Enter')
     raise AssertionError('Review did not terminate')
 with socket.socket() as sock:sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
 server=subprocess.Popen([sys.executable,'-m','http.server',str(port),'--bind','127.0.0.1'],cwd=ROOT,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -28,7 +34,7 @@ with sync_playwright() as p:
     ctx.add_init_script('''window.__spoken=[];window.SpeechSynthesisUtterance=function(t){this.text=t;};speechSynthesis.speak=u=>__spoken.push(u.text);speechSynthesis.cancel=()=>{};speechSynthesis.getVoices=()=>[{lang:'en-US'}];''')
     ctx.route('https://**/*',lambda r:r.fulfill(status=204,body=''))
     pg=ctx.new_page();pg.on('pageerror',lambda e:errors.append(str(e)));pg.goto(base);pg.wait_for_selector('#statDue')
-    check('default is listen-and-spell with fifteen total and three new at most',pg.input_value('#optReviewMode')=='dictation' and pg.input_value('#optReviewLimit')=='15' and pg.input_value('#optNewPer')=='3')
+    check('default is listen-and-spell with thirty per mode and three new at most',pg.input_value('#optReviewMode')=='dictation' and pg.input_value('#optReviewLimit')=='30' and pg.input_value('#optNewPer')=='3')
     seed(pg,[old('word'+str(i)) for i in range(40)],newPerDay=3)
     check('large backlog is shown separately from today\'s fifteen',pg.inner_text('#statDue')=='15' and '25 个词' in pg.inner_text('#reviewBacklog') and pg.inner_text('#statNew')=='0')
     out=ROOT/'output/playwright';out.mkdir(parents=True,exist_ok=True);pg.screenshot(path=str(out/'daily-review-plan-v6.png'),full_page=False)
@@ -48,7 +54,7 @@ with sync_playwright() as p:
     pg.click('#btnHome');pg.reload();pg.wait_for_selector('#statDue')
     check('daily cap survives refresh',pg.inner_text('#statDue')=='0' and pg.inner_text('#statTodayDone')=='15 / 15')
     pg.select_option('#optReviewMode','reading')
-    check('switching modes cannot bypass the daily cap',pg.inner_text('#statDue')=='0')
+    check('reading has its own daily allowance after dictation is full',pg.inner_text('#statDue')=='15' and pg.inner_text('#statTodayDone')=='0 / 15')
     pg.select_option('#optReviewMode','dictation');start(pg)
     check('starting another round cannot reopen a full daily workload',pg.locator('#qCard').count()==0 and pg.inner_text('#statDue')=='0')
     pg.goto(base.replace(DAY,'2026-11-06'));pg.wait_for_selector('#statDue');start(pg);tomorrow=finish(pg)
@@ -72,6 +78,22 @@ with sync_playwright() as p:
     for records in [before,after]:
         for v in records:v.pop('updatedAt',None)
     check('backup preserves the daily budget and complete vocabulary records',after==before and pg.evaluate('JSON.parse(localStorage.getItem("er_daily")).reviewWords.length')==1)
+    seed(pg,[old('word'+str(i)) for i in range(30)],reviewLimit=30)
+    start(pg);first_mode=finish(pg);snapshot=pg.evaluate('ER.getVocab().map(v=>({word:v.word,skills:v.srs.skills}))')
+    pg.click('#btnHome');pg.select_option('#optReviewMode','reading');pg.locator('.review-home').screenshot(path=str(out/'independent-modes-v7.png'));start(pg);second_mode=finish(pg)
+    pg.click('#btnHome');pg.select_option('#optReviewMode','balanced');start(pg);third_mode=finish(pg)
+    check('each mode can complete thirty words on the same day',all(len(w)==30 and len(set(w))==30 for w in [first_mode,second_mode,third_mode]))
+    check('cross-mode extra practice preserves every original skill schedule and memory state',snapshot==pg.evaluate('ER.getVocab().map(v=>({word:v.word,skills:v.srs.skills}))'))
+    check('practice histories retain each mode without false independent grades',pg.evaluate("ER.getVocab().every(v=>['dictation','reading','balanced'].every(m=>v.srs.history.some(h=>h.mode===m))&&v.srs.history.filter(h=>h.mode!=='dictation').every(h=>h.practice&&!h.first))"))
+    pg.click('#btnHome');pg.reload();pg.wait_for_selector('#statDue')
+    check('all three independent counters survive refresh',pg.evaluate("Object.values(JSON.parse(localStorage.getItem('er_daily')).modes).every(m=>m.reviewWords.length===30)"))
+    pg.select_option('#optReviewMode','dictation');check('completed dictation remains full after other modes',pg.inner_text('#statDue')=='0')
+    seed(pg,[old('word'+str(i)) for i in range(8)],reviewLimit=30)
+    start(pg);pg.fill('#spellInput','saved dictation draft');pg.keyboard.press('Escape');pg.click('#btnHome');pg.select_option('#optReviewMode','reading');start(pg)
+    pg.fill('#recallInput','保存的中文草稿');pg.keyboard.press('Escape');pg.click('#btnHome');pg.select_option('#optReviewMode','dictation');pg.click('#btnResume');pg.wait_for_selector('#spellInput')
+    check('switching modes preserves the dictation session and draft',pg.input_value('#spellInput')=='saved dictation draft')
+    pg.keyboard.press('Escape');pg.click('#btnHome');pg.select_option('#optReviewMode','reading');pg.click('#btnResume');pg.wait_for_selector('#recallInput')
+    check('reading also retains its own paused session and draft',pg.input_value('#recallInput')=='保存的中文草稿')
     ctx.close()
     mob=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True);mob.route('https://**/*',lambda r:r.fulfill(status=204,body=''));mp=mob.new_page();mp.on('pageerror',lambda e:errors.append(str(e)));mp.goto(base);mp.wait_for_selector('#statDue');seed(mp,[old('retain')]);mp.click('#btnStart');mp.wait_for_selector('#spellInput')
     check('mobile spelling and daily controls fit the viewport',mp.evaluate('document.documentElement.scrollWidth<=innerWidth+1') and mp.locator('#btnCheck').bounding_box()['height']>=36)

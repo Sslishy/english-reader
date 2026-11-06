@@ -11,11 +11,21 @@ test('daily total includes introductions and never appends extra new words',()=>
  const fresh=Array.from({length:20},(_,i)=>({word:'new'+i,srs:SRS.init(day)}));
  const q=P.plan(fresh,day,settings,{});assert.equal(q.items.length,3);assert.equal(q.newSlots,0);assert.equal(q.newLeft,3);
 });
-test('started words and completed words share a persistent budget across modes',()=>{
+test('each mode owns its budget and cross-mode words become schedule-preserving practice',()=>{
  const words=Array.from({length:20},(_,i)=>old('word'+i));words[0].srs=record(words[0].srs,day);
- const daily={date:day,reviewWords:Array.from({length:14},(_,i)=>'word'+(i+1))};
- for(const mode of ['dictation','reading','balanced']){const p=P.plan(words,day,{...settings,reviewMode:mode},daily);assert.equal(p.used,15);assert.equal(p.items.length,0);assert.equal(p.newSlots,0);}
+ const daily={date:day,modes:{dictation:{reviewWords:Array.from({length:14},(_,i)=>'word'+(i+1))}}};
+ const own=P.plan(words,day,settings,daily);assert.equal(own.used,15);assert.equal(own.items.length,0);
+ for(const mode of ['reading','balanced']){const p=P.plan(words,day,{...settings,reviewMode:mode},daily);assert.equal(p.used,0);assert.equal(p.items.length,15);assert(p.practiceWords.includes('word0'));}
  assert(P.plan(words,SRS.addDays(day,1),settings,daily).items.length>0);
+});
+test('all three modes default to thirty, with independent configurable limits',()=>{
+ const words=Array.from({length:40},(_,i)=>old('word'+i));
+ for(const mode of ['dictation','reading','balanced']){assert.equal(P.limit({reviewMode:mode}),30);assert.equal(P.plan(words,day,{reviewMode:mode,newPerDay:0},{}).items.length,30);}
+ assert.equal(P.limit({reviewMode:'reading',reviewLimit:30,reviewLimits:{reading:10,dictation:30}}),10);
+});
+test('not-due learned words can fill the mode quota without becoming due',()=>{
+ const v=old('retain');v.srs.skills.meaning.due='2026-12-01';const before=JSON.stringify(v.srs);
+ const p=P.plan([v],day,{reviewMode:'reading',newPerDay:0},{});assert.equal(p.items.length,1);assert.deepEqual(p.practiceWords,['retain']);assert.equal(JSON.stringify(v.srs),before);
 });
 test('unheard words have reserved slots even with a persistent overdue backlog',()=>{
  const words=Array.from({length:40},(_,i)=>old('unheard'+i));

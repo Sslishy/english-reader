@@ -48,9 +48,13 @@ var today = ER.today = function(){ return fakeToday || realToday(); };
 ER.setToday = function(d){ fakeToday = d && SRS.isYmd(d) ? d : null; updateBadge(); };
 
 /* ========== 设置 ========== */
-var settings = ER.settings = Object.assign({accent:'en-US',auto:false,size:'20',email:'',text:'',newPerDay:3,cet6:false,reviewMode:'dictation',reviewLimit:15,retention:.9}, lsGet('er_settings',{}));
-if(settings.reviewPolicy!==6){
+var settings = ER.settings = Object.assign({accent:'en-US',auto:false,size:'20',email:'',text:'',newPerDay:3,cet6:false,reviewMode:'dictation',reviewLimit:30,retention:.9}, lsGet('er_settings',{}));
+if((+settings.reviewPolicy||0)<6){
   settings.reviewPolicy=6;settings.reviewMode='dictation';settings.newPerDay=Math.min(3,Math.max(0,+settings.newPerDay||0));settings.reviewLimit=15;settings.retention=.9;
+  lsSet('er_settings',settings,true);lsSet('er_settings_at',Date.now(),true);
+}
+if((+settings.reviewPolicy||0)<7){
+  settings.reviewPolicy=7;settings.reviewLimit=30;settings.reviewLimits={dictation:30,reading:30,balanced:30};
   lsSet('er_settings',settings,true);lsSet('er_settings_at',Date.now(),true);
 }
 function settingsSig(){ var o=Object.assign({},settings); delete o.text; return JSON.stringify(o); }
@@ -620,7 +624,7 @@ $('importFile').onchange=function(){
 /* ========== 同步用：导出 / 合并整份学习数据 ========== */
 function mergeDaily(a,b){
   a=a||{};b=b||{};if(!b.date)return a;if(!a.date||b.date>a.date)return Object.assign({},b);
-  if(b.date===a.date){var out=Object.assign({},a,b,{newDone:Math.max(+a.newDone||0,+b.newDone||0)});['reviewWords','introducedWords'].forEach(function(k){out[k]=Array.from(new Set((a[k]||[]).concat(b[k]||[])));});out.newDone=Math.max(out.newDone,out.introducedWords.length);return out;}return a;
+  if(b.date===a.date){var out=Object.assign({},a,b,{newDone:Math.max(+a.newDone||0,+b.newDone||0)});['reviewWords','introducedWords'].forEach(function(k){out[k]=Array.from(new Set((a[k]||[]).concat(b[k]||[])));});out.modes={};['dictation','reading','balanced'].forEach(function(m){var x=a.modes&&a.modes[m]||{},y=b.modes&&b.modes[m]||{};out.modes[m]={reviewWords:Array.from(new Set((x.reviewWords||[]).concat(y.reviewWords||[])))};});out.newDone=Math.max(out.newDone,out.introducedWords.length);return out;}return a;
 }
 ER.syncState = function(){
   var s=Object.assign({},settings); delete s.text;
