@@ -1,0 +1,218 @@
+{
+  "date": "2026-11-09",
+  "title": "Green AI Institute Aims to Help Developing Countries Fight Climate Change",
+  "title_zh": "绿色人工智能研究所：助力发展中国家应对气候变化",
+  "source_name": "UNESCO — “UNESCO, Brazilian Government and ITU partner to launch green AI Climate Institute” (3 Nov 2026)",
+  "source_url": "https://www.unesco.org/en/articles/unesco-brazilian-government-and-itu-partner-launch-green-ai-climate-institute",
+  "level": "B1–B2 · 雅思 5.5–6.5",
+  "summary_zh": "联合国教科文组织、巴西政府与国际电信联盟合作成立「人工智能气候研究所」（AICI）。研究所将于本月在土耳其安塔利亚举行的 COP31 气候大会上正式启动运营阶段，帮助发展中国家设计伦理、节能的人工智能方案，用于预报极端天气、监测森林砍伐和管理淡水等。研究显示，任务专用模型与优化提示词可将人工智能能耗最高降低约 90%。",
+  "paragraphs": [
+    "UNESCO, the Government of Brazil and the International Telecommunication Union have joined forces to create the Artificial Intelligence Climate Institute, or AICI. The partners plan to launch its operational phase at COP31 in Antalya, Türkiye, on 16 November 2026, after announcing the idea at last year's climate talks.",
+    "Artificial intelligence can help forecast extreme weather, track deforestation and manage freshwater more carefully. Yet many developing countries still face limited computing power, weak data systems and a shortage of technical skills. At the same time, the rapid growth of large AI systems uses large amounts of energy, carbon and water, which can make the climate problem worse if nobody guides the technology.",
+    "The new institute aims to close these gaps. It will help developing nations design, deploy and govern their own ethical and resource-efficient AI tools, instead of depending only on closed software from elsewhere. Local ownership of data and models is a central goal, so countries can keep improving the tools after the first projects end.",
+    "Brazil's telecom regulator will host the AICI secretariat in Brasília inside a Green Digital Action Hub. ITU will share technical know-how on digital infrastructure and training programmes. UNESCO will guide the work with its 2021 Recommendation on the Ethics of Artificial Intelligence and its open-science principles, linking the institute to scientific networks on water and biosphere reserves.",
+    "A joint UNESCO study with University College London found that task-specific models and better prompts can cut AI energy use by up to 90 per cent. That finding supports the institute's push for greener algorithms that still work in places with weak internet connections and limited budgets.",
+    "Training will follow two tracks: policy courses for officials on data governance and climate planning, and hands-on labs for local developers. On launch day, partners will also show pilot projects such as AI tools that help prevent deforestation in the Amazon Basin, open membership to more governments and research groups, and share a public learning repository of climate datasets and green prompting guides."
+  ],
+  "paragraphs_zh": [
+    "联合国教科文组织、巴西政府与国际电信联盟联手成立「人工智能气候研究所」（AICI）。合作方计划于 2026 年 11 月 16 日在土耳其安塔利亚举行的 COP31 气候大会上启动其运营阶段；该设想已在去年气候大会上宣布。",
+    "人工智能有助于更精细地预报极端天气、追踪森林砍伐并管理淡水。然而许多发展中国家仍面临算力有限、数据系统薄弱和技术技能短缺等问题。与此同时，大型人工智能系统快速扩张本身也消耗大量能源、碳排放和水资源，若缺乏引导，甚至可能加重气候问题。",
+    "新研究所旨在弥合这些差距。它将帮助发展中国家设计、部署并治理本国伦理且资源高效的人工智能工具，而不是只依赖外来的封闭软件。数据和模型的本地所有权是核心目标，使各国在首批项目结束后仍能持续改进这些工具。",
+    "巴西电信监管机构将在巴西利亚的绿色数字行动中心托管研究所秘书处。国际电信联盟将分享数字基础设施与培训项目方面的技术专长。教科文组织则以其 2021 年《人工智能伦理建议书》及开放科学原则为指导，并把研究所与水和生物圈保护区等科学网络连接起来。",
+    "教科文组织与伦敦大学学院的一项联合研究发现，任务专用模型和更优的提示词可将人工智能能耗最高降低约 90%。这一发现支持研究所推动更绿色的算法，并使其在网络连接较弱、预算有限的地区也能使用。",
+    "培训将分两条线：面向官员的数据治理与气候规划政策课程，以及面向本地开发者的动手实验室。启动当天，合作方还将展示帮助防止亚马孙流域森林砍伐的人工智能试点项目，向更多政府与研究机构开放成员资格，并共享气候数据集与绿色提示指南等公开学习资源库。"
+  ],
+  "key_words": [
+    {
+      "word": "institute",
+      "phonetic": "/ˈɪnstɪtjuːt/",
+      "meaning_zh": "n. 研究所；机构"
+    },
+    {
+      "word": "ethical",
+      "phonetic": "/ˈeθɪkl/",
+      "meaning_zh": "adj. 伦理的；合乎道德的"
+    },
+    {
+      "word": "deforestation",
+      "phonetic": "/ˌdiːˌfɒrɪˈsteɪʃn/",
+      "meaning_zh": "n. 毁林；森林砍伐"
+    },
+    {
+      "word": "forecast",
+      "phonetic": "/ˈfɔːkɑːst/",
+      "meaning_zh": "v./n. 预报；预测"
+    },
+    {
+      "word": "efficient",
+      "phonetic": "/ɪˈfɪʃnt/",
+      "meaning_zh": "adj. 高效的；节能的"
+    },
+    {
+      "word": "infrastructure",
+      "phonetic": "/ˈɪnfrəstrʌktʃə(r)/",
+      "meaning_zh": "n. 基础设施"
+    },
+    {
+      "word": "governance",
+      "phonetic": "/ˈɡʌvənəns/",
+      "meaning_zh": "n. 治理；管理"
+    },
+    {
+      "word": "pilot",
+      "phonetic": "/ˈpaɪlət/",
+      "meaning_zh": "n./adj. 试点（的）；试验（项目）"
+    },
+    {
+      "word": "algorithm",
+      "phonetic": "/ˈælɡərɪðəm/",
+      "meaning_zh": "n. 算法"
+    },
+    {
+      "word": "capacity",
+      "phonetic": "/kəˈpæsəti/",
+      "meaning_zh": "n. 能力；容量（文中侧重能力建设）"
+    }
+  ],
+  "phrases": [
+    {
+      "text": "joined forces",
+      "meaning_zh": "联手；合力"
+    },
+    {
+      "text": "operational phase",
+      "meaning_zh": "运营阶段；正式运作阶段"
+    },
+    {
+      "text": "extreme weather",
+      "meaning_zh": "极端天气"
+    },
+    {
+      "text": "track deforestation",
+      "meaning_zh": "追踪／监测森林砍伐"
+    },
+    {
+      "text": "computing power",
+      "meaning_zh": "算力；计算能力"
+    },
+    {
+      "text": "technical skills",
+      "meaning_zh": "技术技能"
+    },
+    {
+      "text": "resource-efficient",
+      "meaning_zh": "资源高效的；节约资源的"
+    },
+    {
+      "text": "closed software",
+      "meaning_zh": "封闭软件；专有软件"
+    },
+    {
+      "text": "digital infrastructure",
+      "meaning_zh": "数字基础设施"
+    },
+    {
+      "text": "open-science principles",
+      "meaning_zh": "开放科学原则"
+    },
+    {
+      "text": "task-specific models",
+      "meaning_zh": "任务专用模型"
+    },
+    {
+      "text": "energy use",
+      "meaning_zh": "能源消耗；能耗"
+    },
+    {
+      "text": "up to 90 per cent",
+      "meaning_zh": "最高达百分之九十"
+    },
+    {
+      "text": "weak internet connections",
+      "meaning_zh": "薄弱／不稳定的网络连接"
+    },
+    {
+      "text": "data governance",
+      "meaning_zh": "数据治理"
+    },
+    {
+      "text": "hands-on labs",
+      "meaning_zh": "动手实践实验室"
+    },
+    {
+      "text": "pilot projects",
+      "meaning_zh": "试点项目"
+    },
+    {
+      "text": "Amazon Basin",
+      "meaning_zh": "亚马孙流域"
+    },
+    {
+      "text": "developing countries",
+      "meaning_zh": "发展中国家"
+    },
+    {
+      "text": "climate planning",
+      "meaning_zh": "气候规划"
+    }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "main",
+      "prompt": "What is the main point of the passage?",
+      "options": [
+        "COP31 has already ended deforestation in the Amazon Basin.",
+        "UNESCO, Brazil and ITU are launching an institute to help developing countries build ethical, energy-efficient AI for climate action.",
+        "All AI systems use the same amount of energy in every country.",
+        "Only wealthy nations will be allowed to join the new institute."
+      ],
+      "answer": 1,
+      "explanation": "主旨：教科文组织、巴西与国际电信联盟成立人工智能气候研究所，帮助发展中国家建设伦理、节能的气候相关人工智能能力，并在 COP31 启动运营。",
+      "evidence": [
+        {
+          "paragraph": 0,
+          "quote": "UNESCO, the Government of Brazil and the International Telecommunication Union have joined forces to create the Artificial Intelligence Climate Institute, or AICI."
+        }
+      ]
+    },
+    {
+      "id": "q2",
+      "type": "detail",
+      "prompt": "According to the UNESCO–UCL study, what can reduce AI energy use by up to 90 per cent?",
+      "options": [
+        "Building larger closed software systems only",
+        "Stopping all climate forecasting",
+        "Task-specific models and better prompts",
+        "Moving the secretariat out of Brasília"
+      ],
+      "answer": 2,
+      "explanation": "第 5 段写明：任务专用模型与更优提示词可将人工智能能耗最高降低约 90%。",
+      "evidence": [
+        {
+          "paragraph": 4,
+          "quote": "task-specific models and better prompts can cut AI energy use by up to 90 per cent"
+        }
+      ]
+    },
+    {
+      "id": "q3",
+      "type": "inference",
+      "prompt": "What can be inferred about the institute's training design?",
+      "options": [
+        "It only teaches coding and ignores climate policy.",
+        "It serves both public officials and local technical workers.",
+        "It replaces all national schools with AI teachers.",
+        "It refuses to share any open datasets."
+      ],
+      "answer": 1,
+      "explanation": "末段说明培训分两条线：面向官员的政策课程，以及面向本地开发者的动手实验室，可推断同时服务公共官员与本地技术人才。",
+      "evidence": [
+        {
+          "paragraph": 5,
+          "quote": "Training will follow two tracks: policy courses for officials on data governance and climate planning, and hands-on labs for local developers."
+        }
+      ]
+    }
+  ]
+}
