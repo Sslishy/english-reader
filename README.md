@@ -59,7 +59,7 @@
 - **全部覆盖听音拼写**：默认「听音拼写：覆盖所有词」。每个安排到的词自动发音，先隐藏英文并完整输入，再核对意思和原句；长短语也使用完整输入。所有已学但尚未听写的词会分批补齐，在复习旧词时为首次听写保留部分名额，避免长期轮不到。页面显示听写练习覆盖数量。首次看到的新词先学习，随后听写初练；当天刚看过答案不算延迟掌握。
 - **FSRS 自适应间隔**：本地随包提供 MIT 许可的 `ts-fsrs@5.2.3`（FSRS-6），使用通用参数、目标保留率 90%、关闭随机扰动和日内短期循环。每项能力保留独立记忆状态，依据答题结果、间隔、稳定性和难度计算下次复习。忘记或有提示的任务最早次日再验证；提示后的成功和当天补练不会训练成一次独立成功。90% 是模型安排目标，不是准确率承诺；尚未使用个人日志训练参数。旧进度和到期日期在实际作答前保留，开始使用模型时只回放可验证的历史评分，不凭阶段编造记忆状态。
 - **减少新词堆积**：默认每天最多 3 个实际新词，旧词优先；新词也占所在模式的每日名额。先安排阅读 / 手动收藏，再从四六级补充。新词学习数会保留，刷新不会重复计入。达到上限后不再提供无限“继续剩余词”的入口。
-- **当天收尾**：听音拼写每词每天一次，错词不在当天反复循环。可以暂停后继续；拼写草稿和首字母提示状态会恢复。词义模式和综合模式仍可选择，分别使用自己的每日上限，词义、语境和拼写保留不同进度。拼写答对不会自动证明词义也掌握。
+- **当天收尾**：听音拼写首次选词占每日名额；拼错或点“看答案”的词自动排到后面重试，直到本轮全部词都完整拼对。存在其他待练词时先练其他词；只剩一个错词时继续练它，不设次数上限。重试不额外占用每日名额。首次错误和后续复习日期仍保留，重试是巩固练习，不会覆盖首次评分或提前确认长期掌握。可以暂停后继续；重试队列、已拼对数量、拼写草稿和首字母提示状态会恢复。首页可继续今天尚未拼对的词，包括旧版本已经结束的听写错词。词义模式和综合模式仍可选择，分别使用自己的每日上限，词义、语境和拼写保留不同进度。拼写答对不会自动证明词义也掌握。
 - **回忆证据**：词义题先写一个核心意思，再揭晓释义、自评；不能空白提交或照抄英文。原答案保留到历史和备份中。语境题正常提供中文题干，额外英文首字母提示才算辅助。已认识的词保留低频抽查。词义至少 3 个不同日期无提示通过，并有一次间隔至少 7 天的成功回忆，才显示已通过延迟验证。
 - **分批预估**：未来 14 天显示本模式当前到期任务按其每日上限、新词限额分配的估计，不含模式加练，不包含未来答题产生的新日期，不能当作准确工作量预测。每日上限是负担控制；积压较多时到期词可能延后，不能保证目标保留率仍然达到。
 
@@ -155,7 +155,7 @@ python3 scripts/add_article.py --check                   # 校验 index.json 中
 
 ## 数据与备份
 
-localStorage 键：`er_vocab`（生词 / 短语，每条有 `word`、`type`（`"word"` 或 `"phrase"`）、`zh`、`sentence`、可选 `note`、`source`（`reading` / `manual` / `cet4` / `cet6`）以及 `srs` 进度：兼容字段 `stage`、`due`、`reps`、`lapses`、`last`、`qn`，以及 `skills.meaning/usage/spelling` 独立进度和最近最多 200 条 `history` 事件）、`er_cet_seen`（已学/已标记认识的四六级词）、`er_review_session`（当天队列、提示与回忆状态，仅本机）、`er_daily`（今日已展示的补充新词数）、`er_settings`、`er_cache`（查词缓存）、`er_para_zh`（「全文对照」开关，true / false，仅本机）、`er_tr`（旧版整段翻译历史：键为 `YYYY-MM-DD#段落序号`，值 `{text, fb, fbFor, fbAt, truncated, updatedAt}`，即草稿、最近一次批改、批改对应的译文、批改时间；会同步）、`er_ds_key`（DeepSeek API 密钥，**仅本机**，从不同步 / 备份）。
+localStorage 键：`er_vocab`（生词 / 短语，每条有 `word`、`type`（`"word"` 或 `"phrase"`）、`zh`、`sentence`、可选 `note`、`source`（`reading` / `manual` / `cet4` / `cet6`）以及 `srs` 进度：兼容字段 `stage`、`due`、`reps`、`lapses`、`last`、`qn`，以及 `skills.meaning/usage/spelling` 独立进度和最近最多 200 条 `history` 事件）、`er_cet_seen`（已学/已标记认识的四六级词）、`er_review_session`（当天队列、提示与回忆状态，仅本机）、`er_daily`（今日实际新词数和各模式已开始的词集合）、`er_settings`、`er_cache`（查词缓存）、`er_para_zh`（「全文对照」开关，true / false，仅本机）、`er_tr`（旧版整段翻译历史：键为 `YYYY-MM-DD#段落序号`，值 `{text, fb, fbFor, fbAt, truncated, updatedAt}`，即草稿、最近一次批改、批改对应的译文、批改时间；会同步）、`er_ds_key`（DeepSeek API 密钥，**仅本机**，从不同步 / 备份）。
 GitHub gist 同步的 JSON 在有练习记录时多一个 `translations` 字段（内容同 `er_tr`），按每段的 `updatedAt` 取较新的一份合并；没有练习记录时格式与以前完全相同，旧数据照常可用。
 「导出备份」生成 `{"app":"english-reader","version":2,"data":{vocab, cetSeen, daily, settings, translations, learning}}`（不含 DeepSeek 密钥；导入时 `translations` 总是按段合并）。
 「导入（合并）」：两边都有的词保留最近复习过的那份进度；「导入（覆盖本地）」：完全用备份替换。
@@ -190,6 +190,7 @@ node tests/test_storage.js
 node tests/test_learning_core.js
 python3 tests/test_review.py
 CHROME=/usr/bin/google-chrome python3 tests/test_daily_review.py
+CHROME=/usr/bin/google-chrome python3 tests/test_dictation_retry.py
 python3 tests/test_learning.py
 python3 tests/test_sentence_coach.py
 ```
