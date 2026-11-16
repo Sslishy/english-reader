@@ -193,13 +193,14 @@ function renderHome(msg){
     '<p class="hint" id="reviewBacklog">'+(c.remaining===0?'今天已达到上限，未完成任务可继续原来的进度。':'按到期和记忆情况优先安排。')+' 另有 '+c.pending+' 个词待分批安排。'+(dictation()?'听写练习已覆盖 '+c.covered+' / '+c.total+' 个词，尚未听写的已学词将逐步加入。':'')+'</p>'+
     '<div class="row">'+(resume?'<button class="primary big" id="btnResume">继续上次复习 →</button>':'')+
     '<button class="'+(resume?'':'primary ')+'big" id="btnStart">'+(resume?'按剩余名额重新安排':c.scheduled?'开始今日复习 →':'今日计划已完成')+'</button>'+(repair.length?'<button id="btnRepairSpelling">继续今日未拼对的 '+repair.length+' 个词</button>':'')+'</div>'+
-    '<p class="hint" id="modeBudgetHint">本模式每天最多 '+c.limit+' 个词；三个模式各有独立名额和续练进度。到期词优先，不足时补充加练，加练不改变复习日期。'+(c.requested>c.newLeft?'旧词较多，今天自动减少新词。':'')+'</p>'+
+    '<p class="hint" id="reviewPlanMix">本次安排：到期复习 '+c.dueSelected+' 个 · 轮换加练 '+c.practiceWords.length+' 个 · 新词 '+c.newLeft+' 个。</p>'+
+    '<p class="hint" id="modeBudgetHint">本模式每天最多 '+c.limit+' 个词；三个模式各有独立名额和续练进度。到期词优先；补充加练按本模式未练过、最久未练的顺序轮换，不改变复习日期。'+(c.requested>c.newLeft?'旧词较多，今天自动减少新词。':'')+'</p>'+
     '<div class="mode-progress" aria-label="各模式今日进度">'+[['dictation','听音拼写'],['reading','阅读'],['balanced','综合']].map(function(m){var cfg=Object.assign({},ER.settings,{reviewMode:m[0]});return '<span>'+m[1]+'：'+ReviewPlan.used(ER.getVocab(),today(),daily(),cfg).size+' / '+ReviewPlan.limit(cfg)+'</span>';}).join(' · ')+'</div>'+
     '<div class="review-settings"><label>学习重点 <select id="optReviewMode"><option value="dictation"'+(dictation()?' selected':'')+'>听音拼写：覆盖所有词</option><option value="reading"'+(ER.settings.reviewMode==='reading'?' selected':'')+'>阅读：词义 + 语境</option><option value="balanced"'+(balanced()?' selected':'')+'>综合：分能力练习</option></select></label>'+
-    '<label>本模式每日量 <select id="optReviewLimit">'+[5,10,15,20,30].map(function(n){return '<option value="'+n+'"'+(c.limit===n?' selected':'')+'>'+n+' 个词</option>';}).join('')+'</select></label>'+
+    '<label>本模式每日上限 <select id="optReviewLimit">'+(c.limit<30?[c.limit]:[]).concat([30,40,50,60,70,80,90,100]).map(function(n){return '<option value="'+n+'"'+(c.limit===n?' selected':'')+'>'+n+' 个词'+(n<30?'（原设置）':'')+'</option>';}).join('')+'</select></label>'+
     '<label>每天最多新词 <select id="optNewPer">'+[0,1,2,3,5,10,15,20,30].map(function(n){return '<option value="'+n+'"'+(+ER.settings.newPerDay===n?' selected':'')+'>'+n+'</option>';}).join('')+'</select></label>'+
     '<label class="opt"><input type="checkbox" id="optCet6"'+(ER.settings.cet6?' checked':'')+'> 包含六级</label></div>'+
-    '<details class="review-help"><summary>这一轮会怎样帮助记忆？</summary><p>采用 FSRS 根据每个词的答题结果、间隔和记忆稳定性计算下次复习。目标记忆保留率为 90%，这是模型的安排目标，不是你的实际成绩。当前使用通用参数，尚未用你的历史训练个人参数。</p><p>三个模式每天各有 30 个默认名额，可分别调整。到期词优先，不足时安排已学词加练。同一模式重新安排时，已练的词不再占用名额；同一天跨模式再次接触的词记为加练，不提前晋级，也不改动原定复习日期。听音拼写的错词会自动排到后面重试，直到本轮每个词都拼对；重试不额外占用名额。新词先学习，再初练；每天最多新词的设置仍统计当天实际新学的不同词。</p></details>'+
+    '<details class="review-help"><summary>这一轮会怎样帮助记忆？</summary><p>采用 FSRS 根据每个词的答题结果、间隔和记忆稳定性计算下次复习。目标记忆保留率为 90%，这是模型的安排目标，不是你的实际成绩。当前使用通用参数，尚未用你的历史训练个人参数。</p><p>三个模式默认每天各 30 个名额，可分别调整为 30～100 个。上限不是必须完成的数量，词库不足时不会强凑。到期词优先，不足时按本模式未练过、最久未练的顺序轮换加练；词库足够时避免连续几天总练同一批。错词次日到期、已到复习日期或词库较小时仍可能重复。同一模式重新安排时，已练的词不再占用名额；同一天跨模式再次接触的词记为加练，不提前晋级，也不改动原定复习日期。听音拼写的错词会自动排到后面重试，直到本轮每个词都拼对；重试不额外占用名额。新词先学习，再初练；每天最多新词的设置仍统计当天实际新学的不同词。</p></details>'+
     (oldKnown?'<div class="known-recover"><p>旧版有 '+oldKnown+' 个词曾标记「我认识」而不再出现。</p><button id="btnRestoreKnown">恢复这些词的低频抽查</button></div>':'')+'</div>';
   h+=keyboardHelp()+retentionHtml()+'<div class="card"><h3 class="card-title">未来 14 天到期任务预估</h3><p class="hint">按本模式当前到期任务和每日上限估算，不含加练和未来答题后的新安排。</p>'+calendarHtml()+'</div>';
   box.innerHTML=h;
@@ -210,7 +211,12 @@ function renderHome(msg){
     Promise.all([loadLists(),ensureExamples(),loadContextArticles()]).then(next).catch(function(){renderHome('<p class="err">恢复失败，请重试。</p>');});
   };
   $('optReviewMode').onchange=function(){ER.settings.reviewMode=this.value;ER.saveSettings();ER.updateBadge();renderHome();};
-  $('optReviewLimit').onchange=function(){ER.settings.reviewLimits=Object.assign({},ER.settings.reviewLimits);ER.settings.reviewLimits[ER.settings.reviewMode]=+this.value;ER.saveSettings();clearSession();ER.updateBadge();renderHome();};
+  $('optReviewLimit').onchange=function(){
+    var d=sessionStore(),paused=d.sessions[ER.settings.reviewMode],n=+this.value;
+    ER.settings.reviewLimits=Object.assign({},ER.settings.reviewLimits);ER.settings.reviewLimits[ER.settings.reviewMode]=n;ER.saveSettings();
+    if(paused&&paused.limit<=n){paused.limit=n;ER.lsSet(SESSION_KEY,d,true);}else clearSession();
+    ER.updateBadge();renderHome();
+  };
   $('optCet6').onchange=function(){ER.settings.cet6=this.checked;ER.saveSettings();};
   $('optNewPer').onchange=function(){ER.settings.newPerDay=+this.value;ER.saveSettings();clearSession();ER.updateBadge();renderHome();};
   if(oldKnown) $('btnRestoreKnown').onclick=function(){

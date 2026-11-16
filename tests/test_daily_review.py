@@ -14,7 +14,7 @@ def start(pg):pg.click('#btnStart');pg.wait_for_selector('#qCard,#btnGotIt,#stat
 def answer(pg,value):pg.fill('#spellInput',value);pg.keyboard.press('Enter');pg.wait_for_selector('#btnNext:not([hidden])')
 def finish(pg):
     words=[]
-    for _ in range(50):
+    for _ in range(210):
         if pg.locator('#summaryCard').count():return words
         if pg.locator('#btnGotIt').count():pg.click('#btnGotIt');continue
         s=state(pg);it=s['queue'][s['idx']];word=it['word'];words.append(word)
@@ -96,6 +96,28 @@ with sync_playwright() as p:
     check('switching modes preserves the dictation session and draft',pg.input_value('#spellInput')=='saved dictation draft')
     pg.keyboard.press('Escape');pg.click('#btnHome');pg.select_option('#optReviewMode','reading');pg.click('#btnResume');pg.wait_for_selector('#recallInput')
     check('reading also retains its own paused session and draft',pg.input_value('#recallInput')=='保存的中文草稿')
+    seed(pg,[old('word'+str(i)) for i in range(150)],reviewLimit=30)
+    check('daily limit offers thirty through one hundred',pg.locator('#optReviewLimit option').evaluate_all('(xs)=>xs.map(x=>x.value)')==[str(n) for n in range(30,101,10)])
+    start(pg);first=state(pg)['queue'][0]['word'];answer(pg,'wrong');pg.keyboard.press('Enter');pg.fill('#spellInput','saved after quota change');pg.keyboard.press('Escape');pg.click('#btnHome')
+    pg.select_option('#optReviewLimit','100');pg.reload();pg.wait_for_selector('#btnResume')
+    check('raising the limit survives reload and preserves the paused session',pg.input_value('#optReviewLimit')=='100' and pg.inner_text('#statTodayDone')=='2 / 100')
+    pg.click('#btnResume');pg.wait_for_selector('#spellInput')
+    check('quota change keeps the spelling draft and pending error retry',pg.input_value('#spellInput')=='saved after quota change' and any(q.get('dictationRetry') and q['word']==first for q in state(pg)['queue']))
+    finish(pg)
+    check('finishing the original round offers exactly seventy more slots',pg.inner_text('#btnAgain')=='继续本模式剩余名额（70 个）')
+    pg.click('#btnAgain');pg.wait_for_selector('#spellInput');extra=finish(pg)
+    check('one hundred unique words fill the daily cap and retries do not consume more',len(extra)==70 and pg.evaluate('JSON.parse(localStorage.getItem("er_daily")).modes.dictation.reviewWords.length')==100 and pg.locator('#btnAgain').count()==0)
+    pg.click('#btnHome');pg.select_option('#optReviewMode','reading');pg.select_option('#optReviewLimit','50');pg.select_option('#optReviewMode','dictation')
+    check('higher per-mode limits remain independent',pg.input_value('#optReviewLimit')=='100' and pg.inner_text('#statDue')=='0')
+    future=[old('word'+str(i).zfill(3)) for i in range(60)]
+    for i,v in enumerate(future):
+        v['srs']['skills']={k:{'active':True,'stage':2,'reps':2,'last':'2026-10-30','due':'2026-12-01' if i<30 else '2026-12-02'} for k in ['meaning','spelling']}
+    seed(pg,future,reviewLimit=30);before=pg.evaluate('ER.getVocab().map(v=>v.srs.skills)')
+    check('home explains scheduled reviews separately from rotating extra practice','到期复习 0 个 · 轮换加练 30 个 · 新词 0 个' in pg.inner_text('#reviewPlanMix'))
+    start(pg);batch1=finish(pg);pg.goto(base.replace(DAY,'2026-11-06'));pg.wait_for_selector('#statDue');start(pg);batch2=finish(pg)
+    check('stored practice results rotate tomorrow to thirty different words',len(batch1)==len(batch2)==30 and not set(batch1)&set(batch2))
+    check('cross-day rotation preserves the full original skill schedules',before==pg.evaluate('ER.getVocab().map(v=>v.srs.skills)'))
+    pg.click('#btnHome');pg.select_option('#optReviewLimit','100');pg.locator('.review-home').screenshot(path=str(out/'review-rotation-limits-v9.png'))
     ctx.close()
     mob=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True);mob.route('https://**/*',lambda r:r.fulfill(status=204,body=''));mp=mob.new_page();mp.on('pageerror',lambda e:errors.append(str(e)));mp.goto(base);mp.wait_for_selector('#statDue');seed(mp,[old('retain')]);mp.click('#btnStart');mp.wait_for_selector('#spellInput')
     check('mobile spelling and daily controls fit the viewport',mp.evaluate('document.documentElement.scrollWidth<=innerWidth+1') and mp.locator('#btnCheck').bounding_box()['height']>=36)
