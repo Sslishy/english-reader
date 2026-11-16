@@ -23,9 +23,68 @@ test('all three modes default to thirty, with independent configurable limits',(
  for(const mode of ['dictation','reading','balanced']){assert.equal(P.limit({reviewMode:mode}),30);assert.equal(P.plan(words,day,{reviewMode:mode,newPerDay:0},{}).items.length,30);}
  assert.equal(P.limit({reviewMode:'reading',reviewLimit:30,reviewLimits:{reading:10,dictation:30}}),10);
 });
+test('each mode supports thirty through one hundred without sharing its allowance',()=>{
+ const words=Array.from({length:130},(_,i)=>old('word'+i));
+ for(const mode of ['dictation','reading','balanced'])for(const cap of [30,40,50,60,70,80,90,100]){
+  const cfg={reviewMode:mode,reviewLimits:{[mode]:cap},newPerDay:0},p=P.plan(words,day,cfg,{});
+  assert.equal(p.limit,cap);assert.equal(p.items.length,cap);assert.equal(new Set(p.items.map(v=>v.word)).size,cap);
+ }
+ assert.equal(P.limit({reviewMode:'reading',reviewLimits:{reading:1000}}),100);
+ const cfg={reviewMode:'dictation',reviewLimits:{dictation:100,reading:40},newPerDay:0};
+ const daily={date:day,modes:{dictation:{reviewWords:words.slice(0,30).map(v=>v.word)}}};
+ assert.equal(P.plan(words,day,cfg,daily).items.length,70);
+ assert.equal(P.plan(words,day,{...cfg,reviewMode:'reading'},daily).items.length,40);
+});
+test('legacy per-mode caps below thirty stay in force and are not raised',()=>{
+ for(const cap of [5,10,15,20]){
+  assert.equal(P.limit({reviewMode:'dictation',reviewLimit:30,reviewLimits:{dictation:cap}}),cap);
+  const words=Array.from({length:40},(_,i)=>old('legacy'+cap+'-'+i));
+  assert.equal(P.plan(words,day,{reviewMode:'dictation',reviewLimits:{dictation:cap},newPerDay:0},{}).items.length,cap);
+ }
+});
 test('not-due learned words can fill the mode quota without becoming due',()=>{
  const v=old('retain');v.srs.skills.meaning.due='2026-12-01';const before=JSON.stringify(v.srs);
  const p=P.plan([v],day,{reviewMode:'reading',newPerDay:0},{});assert.equal(p.items.length,1);assert.deepEqual(p.practiceWords,['retain']);assert.equal(JSON.stringify(v.srs),before);
+});
+function futureWords(n){return Array.from({length:n},(_,i)=>{
+ const v=old('word'+String(i).padStart(3,'0'));
+ for(const k of ['meaning','usage','spelling'])Object.assign(v.srs.skills[k],{active:true,due:i<30?'2026-12-01':'2026-12-02'});
+ return v;
+});}
+function practiceBatch(batch,date,mode){
+ for(const v of batch){const skill=mode==='dictation'?'spelling':'meaning',prior=JSON.parse(JSON.stringify(v.srs.skills));
+  v.srs=SRS.record(v.srs,{skill,date,rating:'good',mode,practice:true});v.srs.skills=prior;
+ }
+}
+test('extra practice rotates across days in every mode and preserves original schedules',()=>{
+ for(const mode of ['dictation','reading','balanced']){
+  const words=futureWords(60),cfg={reviewMode:mode,newPerDay:0},before=words.map(v=>JSON.stringify(v.srs.skills));
+  const a=P.plan(words,day,cfg,{});practiceBatch(a.items,day,mode);
+  const b=P.plan(words,SRS.addDays(day,1),cfg,{});assert.equal(b.items.length,30);assert(!b.items.some(v=>a.items.includes(v)));
+  practiceBatch(b.items,SRS.addDays(day,1),mode);
+  const c=P.plan(words,SRS.addDays(day,2),cfg,{});assert.deepEqual(c.items.map(v=>v.word),a.items.map(v=>v.word));
+  assert.deepEqual(words.map(v=>JSON.stringify(v.srs.skills)),before);assert.equal(a.dueSelected,0);assert.equal(a.practiceWords.length,30);
+ }
+});
+test('rotation uses mode history, counts retries as exposure, and ignores future records',()=>{
+ const words=futureWords(60),cfg={reviewMode:'dictation',newPerDay:0};
+ practiceBatch(words.slice(0,30),SRS.addDays(day,-1),'dictation');
+ practiceBatch(words.slice(30),SRS.addDays(day,-1),'reading');
+ const p=P.plan(words,day,cfg,{});assert(p.items.every(v=>words.slice(30).includes(v)));
+ words[30].srs.history.push({skill:'spelling',mode:'dictation',date:'2027-01-01',rating:'good',practice:true});
+ assert(P.plan(words,day,cfg,{}).items.includes(words[30]));
+});
+test('due reviews stay ahead of rotation and an insufficient pool is not duplicated',()=>{
+ const words=futureWords(60),cfg={reviewMode:'dictation',newPerDay:0};
+ practiceBatch(words.slice(0,30),SRS.addDays(day,-1),'dictation');
+ words[0].srs.skills.spelling.due=day;
+ const p=P.plan(words,day,cfg,{});assert.equal(p.items[0],words[0]);assert.equal(p.dueSelected,1);assert.equal(p.practiceWords.length,29);
+ const small=P.plan(words.slice(0,4),day,{...cfg,reviewLimit:100},{});assert.equal(small.items.length,4);assert.equal(new Set(small.items).size,4);
+});
+test('rotation order is deterministic for imported or reordered vocabulary',()=>{
+ const words=futureWords(60),cfg={reviewMode:'dictation',newPerDay:0},before=JSON.stringify(words);
+ assert.deepEqual(P.plan(words,day,cfg,{}).items.map(v=>v.word),P.plan(words.slice().reverse(),day,cfg,{}).items.map(v=>v.word));
+ assert.equal(JSON.stringify(words),before);
 });
 test('unheard words have reserved slots even with a persistent overdue backlog',()=>{
  const words=Array.from({length:40},(_,i)=>old('unheard'+i));

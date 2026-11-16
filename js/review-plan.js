@@ -4,13 +4,23 @@
 var SRS=root.SRS||(typeof require==='function'?require('./srs.js').SRS:null);
 function key(w){return String(w||'').toLowerCase().replace(/\s+/g,' ').trim();}
 function mode(settings){return ['dictation','reading','balanced'].indexOf(settings.reviewMode)>=0?settings.reviewMode:'dictation';}
-function limit(settings){return Math.max(5,Math.min(30,Math.floor(+(settings.reviewLimits&&settings.reviewLimits[mode(settings)])||+settings.reviewLimit||30)));}
+function limit(settings){return Math.max(5,Math.min(100,Math.floor(+(settings.reviewLimits&&settings.reviewLimits[mode(settings)])||+settings.reviewLimit||30)));}
 function dictation(settings){return settings.reviewMode==='dictation';}
 function dueDate(v,settings){
   if(dictation(settings)){var sk=v.srs.skills.spelling;return sk.active?sk.due:v.srs.added;}
   return SRS.dueDate(v.srs,settings.reviewMode==='balanced');
 }
 function historyMode(h){return h.mode||(['order','gaps','en2zh','zh2en'].indexOf(h.task)>=0?'balanced':h.skill==='spelling'?'dictation':'reading');}
+// Include extra practice: its skill schedule is deliberately unchanged, but it still counts as exposure.
+function lastModePractice(v,date,settings){
+  var name=mode(settings),last='',hist=v.srs.history||[];
+  hist.forEach(function(h){if(h.date<=date&&historyMode(h)===name&&h.date>last)last=h.date;});
+  if(!hist.length){
+    var skills=name==='dictation'?['spelling']:name==='reading'?['meaning','usage']:['meaning','usage','spelling'];
+    skills.forEach(function(k){var d=v.srs.skills[k].last;if(d&&d<=date&&d>last)last=d;});
+  }
+  return last;
+}
 function used(vocab,date,daily,settings){
   var name=mode(settings||{}),bucket=daily&&daily.date===date&&daily.modes&&daily.modes[name];
   var out=new Set(bucket?(bucket.reviewWords||[]).map(key):[]);
@@ -44,10 +54,13 @@ function plan(vocab,date,settings,daily){
   var newSlots=Math.min(requested,Math.max(0,left-selected.length));
   var introductions=fresh.slice(0,newSlots);selected=selected.concat(introductions);
   var cetSlots=newSlots-introductions.length;
-  later.sort(function(a,b){return dueDate(a,settings).localeCompare(dueDate(b,settings));});
+  var recent=new Map();later.forEach(function(v){recent.set(v,lastModePractice(v,date,settings));});
+  later.sort(function(a,b){
+    return recent.get(a).localeCompare(recent.get(b))||Number(exposed.has(key(a.word)))-Number(exposed.has(key(b.word)))||dueDate(a,settings).localeCompare(dueDate(b,settings))||byAdded(a,b);
+  });
   selected=selected.concat(later.slice(0,Math.max(0,left-selected.length-cetSlots)));
   var practiceWords=selected.filter(function(v){return exposed.has(key(v.word))||dueDate(v,settings)>date;}).map(function(v){return key(v.word);});
-  return {limit:cap,used:done.size,remaining:left,items:selected,newSlots:cetSlots,newWords:introductions.length,newLeft:newSlots,practiceWords:practiceWords,
+  return {limit:cap,used:done.size,remaining:left,items:selected,newSlots:cetSlots,newWords:introductions.length,newLeft:newSlots,practiceWords:practiceWords,dueSelected:selected.length-introductions.length-practiceWords.length,
     due:old.length+first.length,firstSpelling:first.length,unlearned:fresh.length,pending:Math.max(0,old.length+first.length+fresh.length+later.length-selected.length),total:vocab.length};
 }
 function forecast(vocab,date,settings,days,daily){
