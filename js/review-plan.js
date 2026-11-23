@@ -40,21 +40,25 @@ function plan(vocab,date,settings,daily){
     if(dueDate(v,settings)>date){later.push(v);return;}
     if(dictation(settings)&&!v.srs.skills.spelling.active)first.push(v);else old.push(v);
   });
+  var recent=new Map();
+  old.concat(later).forEach(function(v){recent.set(v,lastModePractice(v,date,settings));});
+  function byAdded(a,b){return a.srs.added.localeCompare(b.srs.added)||key(a.word).localeCompare(key(b.word));}
   old.sort(function(a,b){
+    var rec=recent.get(a).localeCompare(recent.get(b));
+    if(rec)return rec;
     var skill=dictation(settings)?'spelling':'meaning',ra=SRS.retrievability(a.srs,skill,date),rb=SRS.retrievability(b.srs,skill,date);
     if(ra!=null&&rb!=null&&ra!==rb)return ra-rb;
-    var da=dueDate(a,settings),db=dueDate(b,settings);return da<db?-1:da>db?1:0;
+    var da=dueDate(a,settings),db=dueDate(b,settings);return da<db?-1:da>db?1:byAdded(a,b);
   });
-  function byAdded(a,b){return a.srs.added.localeCompare(b.srs.added)||key(a.word).localeCompare(key(b.word));}
   first.sort(byAdded);fresh.sort(byAdded);
-  var reserve=Math.min(first.length,Math.max(1,Math.floor(left/4))),oldBatch=old.slice(0,Math.max(0,left-reserve));
-  var selected=oldBatch.concat(first.slice(0,left-oldBatch.length));
-  selected=selected.concat(old.slice(oldBatch.length,oldBatch.length+left-selected.length));
   var requested=Math.max(0,(+settings.newPerDay||0)-((daily&&daily.date===date&&+daily.newDone)||0));
-  var newSlots=Math.min(requested,Math.max(0,left-selected.length));
+  var newSlots=Math.min(requested,left);
+  var reviewCap=Math.max(0,left-newSlots);
+  var reserve=reviewCap?Math.min(first.length,Math.max(1,Math.floor(reviewCap/4))):0,oldBatch=old.slice(0,Math.max(0,reviewCap-reserve));
+  var selected=oldBatch.concat(first.slice(0,reviewCap-oldBatch.length));
+  selected=selected.concat(old.slice(oldBatch.length,oldBatch.length+reviewCap-selected.length));
   var introductions=fresh.slice(0,newSlots);selected=selected.concat(introductions);
   var cetSlots=newSlots-introductions.length;
-  var recent=new Map();later.forEach(function(v){recent.set(v,lastModePractice(v,date,settings));});
   later.sort(function(a,b){
     return recent.get(a).localeCompare(recent.get(b))||Number(exposed.has(key(a.word)))-Number(exposed.has(key(b.word)))||dueDate(a,settings).localeCompare(dueDate(b,settings))||byAdded(a,b);
   });
@@ -67,8 +71,9 @@ function forecast(vocab,date,settings,days,daily){
   var out=[],cap=limit(settings),buckets=new Array(days).fill(0),freshBuckets=new Array(days).fill(0),waiting=0,fresh=0;
   vocab.forEach(function(v){var d=Math.max(0,SRS.diffDays(date,dueDate(v,settings)));if(d<days)(!v.srs.reps&&!v.srs.skills.meaning.known?freshBuckets:buckets)[d]++;});
   for(var i=0;i<days;i++){
-    waiting+=buckets[i];fresh+=freshBuckets[i];var capacity=i===0?Math.max(0,cap-used(vocab,date,daily,settings).size):cap,n=Math.min(capacity,waiting);waiting-=n;
-    var allowance=Math.max(0,(+settings.newPerDay||0)-(i===0&&daily&&daily.date===date?(+daily.newDone||0):0)),introduced=Math.min(capacity-n,allowance,fresh);fresh-=introduced;
+    waiting+=buckets[i];fresh+=freshBuckets[i];var capacity=i===0?Math.max(0,cap-used(vocab,date,daily,settings).size):cap;
+    var allowance=Math.max(0,(+settings.newPerDay||0)-(i===0&&daily&&daily.date===date?(+daily.newDone||0):0)),introduced=Math.min(capacity,allowance,fresh);fresh-=introduced;
+    var n=Math.min(capacity-introduced,waiting);waiting-=n;
     out.push({date:SRS.addDays(date,i),count:n+introduced,pending:waiting+fresh});
   }
   return out;

@@ -5,17 +5,31 @@ const day='2026-11-05',settings={reviewMode:'dictation',reviewLimit:15,newPerDay
 function test(name,f){f();console.log('PASS '+name);n++;}
 function old(word){return {word,srs:SRS.normalize({stage:2,due:day,reps:2,last:'2026-10-30',added:'2026-10-20'},day)};}
 const record=(s,date,rating='good',extra={})=>SRS.record(s,{skill:'spelling',date,rating,scheduler:'fsrs',...extra});
-test('daily total includes introductions and never appends extra new words',()=>{
+test('daily total reserves new-word slots within cap and never exceeds daily limit',()=>{
  const words=Array.from({length:40},(_,i)=>old('word'+i)),copy=JSON.stringify(words);
- const p=P.plan(words,day,settings,{});assert.equal(p.items.length,15);assert.equal(p.newSlots,0);assert.equal(p.firstSpelling,40);assert.equal(JSON.stringify(words),copy);
+ const p=P.plan(words,day,settings,{});assert.equal(p.items.length,12);assert.equal(p.newSlots,3);assert.equal(p.items.length+p.newSlots,15);assert.equal(p.firstSpelling,40);assert.equal(JSON.stringify(words),copy);
  const fresh=Array.from({length:20},(_,i)=>({word:'new'+i,srs:SRS.init(day)}));
  const q=P.plan(fresh,day,settings,{});assert.equal(q.items.length,3);assert.equal(q.newSlots,0);assert.equal(q.newLeft,3);
+ const mixed=words.concat(fresh.slice(0,5));
+ const m=P.plan(mixed,day,settings,{});assert.equal(m.items.length,15);assert.equal(m.newWords,3);assert.equal(m.newSlots,0);assert.equal(m.newLeft,3);
+});
+test('overdue backlog rotates across days instead of repeating yesterday\'s missed words first',()=>{
+ const words=Array.from({length:40},(_,i)=>{
+  const v=old('due'+String(i).padStart(2,'0'));
+  v.srs.skills.spelling.active=true;v.srs.skills.spelling.due=day;
+  return v;
+ });
+ const cfg={reviewMode:'dictation',reviewLimit:15,newPerDay:0};
+ const d1=P.plan(words,day,cfg,{});assert.equal(d1.items.length,15);
+ for(const v of d1.items)v.srs=record(v.srs,day,'again');
+ const d2=P.plan(words,SRS.addDays(day,1),cfg,{});assert.equal(d2.items.length,15);
+ assert(!d2.items.some(v=>d1.items.includes(v)));
 });
 test('each mode owns its budget and cross-mode words become schedule-preserving practice',()=>{
  const words=Array.from({length:20},(_,i)=>old('word'+i));words[0].srs=record(words[0].srs,day);
  const daily={date:day,modes:{dictation:{reviewWords:Array.from({length:14},(_,i)=>'word'+(i+1))}}};
  const own=P.plan(words,day,settings,daily);assert.equal(own.used,15);assert.equal(own.items.length,0);
- for(const mode of ['reading','balanced']){const p=P.plan(words,day,{...settings,reviewMode:mode},daily);assert.equal(p.used,0);assert.equal(p.items.length,15);assert(p.practiceWords.includes('word0'));}
+ for(const mode of ['reading','balanced']){const p=P.plan(words,day,{...settings,reviewMode:mode},daily);assert.equal(p.used,0);assert.equal(p.items.length,12);assert.equal(p.newSlots,3);assert(p.practiceWords.includes('word0'));}
  assert(P.plan(words,SRS.addDays(day,1),settings,daily).items.length>0);
 });
 test('all three modes default to thirty, with independent configurable limits',()=>{
